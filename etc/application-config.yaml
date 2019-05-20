@@ -1,6 +1,11 @@
 http:
   port: 8080
 kafka:
-  bootstrap-servers: localhost:9092
+  bootstrap-servers: localhost:9093
   group-id: incident-priority
   topic-incident-assignment-event: topic-incident-event
+  security-protocol: SSL
+  ssl-keystore-location: /app/kafka/keystore.jks
+  ssl-keystore-password: pass
+  ssl-truststore-location: /app/kafka/truststore.jks
+  ssl-truststore-password: pass
