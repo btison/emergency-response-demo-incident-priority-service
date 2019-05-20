@@ -32,8 +32,10 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             kafkaConfig.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             kafkaConfig.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
             kafkaConfig.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, config().getString("security-protocol"));
+            kafkaConfig.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, config().getString("ssl-keystore-type"));
             kafkaConfig.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, config().getString("ssl-keystore-location"));
             kafkaConfig.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, config().getString("ssl-keystore-password"));
+            kafkaConfig.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, config().getString("ssl-truststore-type"));
             kafkaConfig.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, config().getString("ssl-truststore-location"));
             kafkaConfig.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, config().getString("ssl-truststore-password"));
             kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
