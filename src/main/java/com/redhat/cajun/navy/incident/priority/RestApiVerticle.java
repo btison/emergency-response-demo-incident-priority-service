@@ -20,18 +20,25 @@ public class RestApiVerticle extends AbstractVerticle {
 
         Router router = Router.router(vertx);
 
-        router.route("/metrics").handler(PrometheusScrapingHandler.create());
+        router.get("/priority/:incidentId").handler(this::priority);
+        router.post("/reset").handler(this::reset);
+
+        Router mgmtRouter = Router.router(vertx);
+        mgmtRouter.route("/metrics").handler(PrometheusScrapingHandler.create());
 
         HealthCheckHandler healthCheckHandler = HealthCheckHandler.create(vertx)
                 .register("health", f -> f.complete(Status.OK()));
-        router.get("/health").handler(healthCheckHandler);
-        router.get("/priority/:incidentId").handler(this::priority);
-        router.post("/reset").handler(this::reset);
+        mgmtRouter.get("/health").handler(healthCheckHandler);
 
         return vertx.createHttpServer()
                 .requestHandler(router)
                 .rxListen(config.getInteger("port", 8080))
-                .ignoreElement();
+                .ignoreElement()
+                .andThen(vertx.createHttpServer()
+                    .requestHandler(mgmtRouter)
+                    .rxListen(config.getInteger("management-port",9080))
+                    .ignoreElement()
+                    );
     }
 
     private void priority(RoutingContext rc) {

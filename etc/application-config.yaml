@@ -1,5 +1,6 @@
 http:
   port: 8080
+  management-port: 9080
 kafka:
   bootstrap-servers: localhost:9092
   group-id: incident-priority
