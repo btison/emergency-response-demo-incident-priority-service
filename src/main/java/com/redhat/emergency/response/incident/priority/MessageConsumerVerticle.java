@@ -3,6 +3,7 @@ package com.redhat.emergency.response.incident.priority;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.redhat.cajun.navy.incident.priority.tracing.TracingKafkaConsumer;
 import com.redhat.cajun.navy.incident.priority.tracing.TracingKafkaUtils;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
@@ -13,14 +14,13 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.reactivex.core.AbstractVerticle;
-import io.vertx.reactivex.kafka.client.consumer.KafkaConsumer;
 import io.vertx.reactivex.kafka.client.consumer.KafkaConsumerRecord;
 
 public class MessageConsumerVerticle extends AbstractVerticle {
 
     private final static Logger log = LoggerFactory.getLogger("MessageConsumer");
 
-    private KafkaConsumer<String, String> kafkaConsumer;
+    private TracingKafkaConsumer<String, String> kafkaConsumer;
 
     private Tracer tracer;
 
@@ -36,17 +36,14 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             kafkaConfig.put("group.id", config().getString("group-id"));
             kafkaConfig.put("auto.offset.reset", "earliest");
             kafkaConfig.put("enable.auto.commit", "false");
-            kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
-            kafkaConsumer.handler(this::handleMessage);
-            kafkaConsumer.subscribe(config().getString("topic-incident-assignment-event"));
+            kafkaConsumer = TracingKafkaConsumer.<String, String>create(vertx, kafkaConfig, tracer)
+                .handler(this::handleMessage)
+                .subscribe(config().getString("topic-incident-assignment-event"));
             future.complete();
         }));
     }
 
     private void handleMessage(KafkaConsumerRecord<String, String> msg) {
-
-        // move to consumer
-        TracingKafkaUtils.buildAndFinishChildSpan(msg, tracer);
 
         try {
             JsonObject message = new JsonObject(msg.value());
@@ -90,8 +87,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     public Completable rxStop() {
         if (kafkaConsumer != null) {
             kafkaConsumer.commit();
-            kafkaConsumer.unsubscribe();
-            kafkaConsumer.close();
+            kafkaConsumer.unsubscribe().close();
         }
         return Completable.complete();
     }
