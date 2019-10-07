@@ -3,7 +3,12 @@ package com.redhat.emergency.response.incident.priority;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.redhat.cajun.navy.incident.priority.tracing.TracingKafkaUtils;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.util.GlobalTracer;
 import io.reactivex.Completable;
+import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -17,10 +22,13 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private KafkaConsumer<String, String> kafkaConsumer;
 
+    private Tracer tracer;
+
     @Override
     public Completable rxStart() {
 
         return Completable.fromMaybe(vertx.rxExecuteBlocking(future -> {
+            tracer = GlobalTracer.get();
             Map<String, String> kafkaConfig = new HashMap<>();
             kafkaConfig.put("bootstrap.servers", config().getString("bootstrap-servers"));
             kafkaConfig.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
@@ -36,6 +44,9 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     private void handleMessage(KafkaConsumerRecord<String, String> msg) {
+
+        // move to consumer
+        TracingKafkaUtils.buildAndFinishChildSpan(msg, tracer);
 
         try {
             JsonObject message = new JsonObject(msg.value());
@@ -55,11 +66,19 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                     || body.getBoolean("assignment") == null) {
                 log.warn("Message of type '" + "' has unexpected structure: " + message.toString());
             }
-            String incidentId = message.getJsonObject("body").getString("incidentId");
-            log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'. Topic: " + msg.topic()
-                    + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
 
-            vertx.eventBus().send("incident-assignment-event", body);
+            Span span = TracingKafkaUtils.buildChildSpan("incidentAssignmentEvent", msg, tracer);
+            try {
+                String incidentId = message.getJsonObject("body").getString("incidentId");
+                log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'. Topic: " + msg.topic()
+                        + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
+
+                DeliveryOptions options = new DeliveryOptions();
+                TracingKafkaUtils.injectInEventBusMessage(span.context(), options, tracer);
+                vertx.eventBus().send("incident-assignment-event", body, options);
+            } finally {
+                span.finish();
+            }
 
         } finally {
             //commit message

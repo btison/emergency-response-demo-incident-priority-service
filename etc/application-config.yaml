@@ -4,3 +4,16 @@ kafka:
   bootstrap-servers: localhost:9092
   group-id: incident-priority
   topic-incident-assignment-event: topic-incident-event
+
+# tracing
+tracing:
+  service-name: incident-priority-service
+  reporter-log-spans: true
+  sampler-type: remote
+  sampler-param: 0.1
+  sampler-manager-host-port: localhost:5778
+  agent-host: localhost
+  agent-port: 6831
+  # const
+  # sampler-type: const
+  # sampler-param: 1

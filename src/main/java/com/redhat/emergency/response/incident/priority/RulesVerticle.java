@@ -5,6 +5,10 @@ import java.util.stream.StreamSupport;
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssignmentEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
+import com.redhat.cajun.navy.incident.priority.tracing.TracingKafkaUtils;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.util.GlobalTracer;
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
@@ -33,11 +37,14 @@ public class RulesVerticle extends AbstractVerticle {
 
     private KieSession ksession;
 
+    private Tracer tracer;
+
     @Override
     public Completable rxStart() {
         
         return Completable.fromMaybe(vertx.<Void>rxExecuteBlocking(future -> {
             try {
+                tracer = GlobalTracer.get();
                 kbase = setupKieBase("com/redhat/emergency/response/incident/priority/rules/priority_rules.drl");
                 initSession();
 
@@ -69,37 +76,55 @@ public class RulesVerticle extends AbstractVerticle {
 
     private void assignmentEvent(Message<JsonObject> message) {
         log.debug("AssignmentEvent - received message: " + message.body().toString());
-        IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
-                message.body().getBoolean("assignment"));
-        ksession.insert(incidentAssignmentEvent);
-        ksession.fireAllRules();
+
+        Span span = TracingKafkaUtils.buildChildSpan("incidentPriorityAssignment", message, tracer);
+
+        try {
+            IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
+                    message.body().getBoolean("assignment"));
+            ksession.insert(incidentAssignmentEvent);
+            ksession.fireAllRules();
+        } finally {
+            if (span != null) {
+                span.finish();
+            }
+        }
     }
 
     private void incidentPriority(Message<JsonObject> message) {
         log.debug("IncidentPriority - received message: " + message.body().toString());
-        String incidentId = message.body().getString("incidentId");
-        QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
-        QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
-        Integer priority;
-        if (row == null) {
-            priority =0;
-        } else {
-            priority = ((IncidentPriority)row.get("incidentPriority")).getPriority();
-        }
 
-        results = ksession.getQueryResults("averagePriority");
-        row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
-        Double average;
-        if (row == null) {
-            average = 0.0;
-        } else {
-            average = ((AveragePriority)row.get("averagePriority")).getAveragePriority();
-        }
+        Span span = TracingKafkaUtils.buildChildSpan("getIncidentPriority", message, tracer);
 
-        results = ksession.getQueryResults("incidents");
-        JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
-                .put("average", average).put("incidents", results.size());
-        message.reply(jsonObject);
+        try {
+            String incidentId = message.body().getString("incidentId");
+            QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
+            QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+            Integer priority;
+            if (row == null) {
+                priority = 0;
+            } else {
+                priority = ((IncidentPriority) row.get("incidentPriority")).getPriority();
+            }
+
+            results = ksession.getQueryResults("averagePriority");
+            row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+            Double average;
+            if (row == null) {
+                average = 0.0;
+            } else {
+                average = ((AveragePriority) row.get("averagePriority")).getAveragePriority();
+            }
+
+            results = ksession.getQueryResults("incidents");
+            JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
+                    .put("average", average).put("incidents", results.size());
+            message.reply(jsonObject);
+        } finally {
+            if (span != null) {
+                span.finish();
+            }
+        }
     }
 
 
