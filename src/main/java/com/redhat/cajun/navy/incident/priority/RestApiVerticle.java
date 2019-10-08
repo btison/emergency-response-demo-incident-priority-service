@@ -36,7 +36,7 @@ public class RestApiVerticle extends AbstractVerticle {
 
     private void priority(RoutingContext rc) {
         String incidentId = rc.request().getParam("incidentId");
-        vertx.eventBus().rxSend("incident-priority", new JsonObject().put("incidentId", incidentId))
+        vertx.eventBus().rxRequest("incident-priority", new JsonObject().put("incidentId", incidentId))
                 .subscribe((json) -> rc.response().setStatusCode(200)
                                 .putHeader("content-type", "application/json")
                                 .end(json.body().toString()),
@@ -44,7 +44,7 @@ public class RestApiVerticle extends AbstractVerticle {
     }
 
     private void reset(RoutingContext rc) {
-        vertx.eventBus().rxSend("reset", new JsonObject())
+        vertx.eventBus().rxRequest("reset", new JsonObject())
                 .subscribe((json) -> rc.response().setStatusCode(200).end(), rc::fail);
     }
 }

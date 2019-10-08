@@ -12,11 +12,17 @@
     <skipTests>false</skipTests>
     <skipITs>${skipTests}</skipITs>
     <skipUTs>${skipTests}</skipUTs>
-    <version.vertx>3.6.3.redhat-00009</version.vertx>
+    <version.vertx>3.8.1.redhat-00005</version.vertx>
     <version.fabric8-maven-plugin>3.5.41</version.fabric8-maven-plugin>
-    <version.vertx-maven-plugin>1.0.18</version.vertx-maven-plugin>
+    <version.vertx-maven-plugin>1.0.20</version.vertx-maven-plugin>
     <version.rhdm>7.18.0.Final-redhat-00002</version.rhdm>
     <version.prometheus>0.0.23</version.prometheus>
+    <version.commons-io>2.6</version.commons-io>
+    <version.commons-lang3>3.8.1</version.commons-lang3>
+    <version.slf4j>1.7.25</version.slf4j>
+    <version.logback>1.2.3</version.logback>
+    <version.logstash>5.1</version.logstash>
+    <version.junit>4.12</version.junit>
     <vertx.verticle>com.redhat.cajun.navy.incident.priority.MainVerticle</vertx.verticle>
   </properties>
   <dependencyManagement>
@@ -72,37 +78,31 @@
     <dependency>
       <groupId>io.vertx</groupId>
       <artifactId>vertx-micrometer-metrics</artifactId>
-      <version>3.7.0</version>
-    </dependency>
-    <dependency>
-      <groupId>io.micrometer</groupId>
-      <artifactId>micrometer-registry-prometheus</artifactId>
-      <version>1.1.4</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
-      <version>2.6</version>
+      <version>${version.commons-io}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
-      <version>3.8.1</version>
+      <version>${version.commons-lang3}</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>1.7.25</version>
+      <version>${version.slf4j}</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.2.3</version>
+      <version>${version.logback}</version>
     </dependency>
     <dependency>
       <groupId>net.logstash.logback</groupId>
       <artifactId>logstash-logback-encoder</artifactId>
-      <version>5.1</version>
+      <version>${version.logstash}</version>
     </dependency>
     <dependency>
       <groupId>org.drools</groupId>
@@ -112,7 +112,7 @@
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.12</version>
+      <version>${version.junit}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
