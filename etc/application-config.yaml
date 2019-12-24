@@ -4,3 +4,5 @@ kafka:
   bootstrap-servers: localhost:9092
   group-id: incident-priority
   topic-incident-assignment-event: topic-incident-event
+ha:
+  leader-configmap: test

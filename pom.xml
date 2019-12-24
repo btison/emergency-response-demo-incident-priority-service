@@ -19,6 +19,7 @@
     <version.prometheus>0.0.23</version.prometheus>
     <version.commons-io>2.6</version.commons-io>
     <version.commons-lang3>3.8.1</version.commons-lang3>
+    <version.kubernetes-client>4.6.0</version.kubernetes-client>
     <version.slf4j>1.7.25</version.slf4j>
     <version.logback>1.2.3</version.logback>
     <version.logstash>5.1</version.logstash>
@@ -108,6 +109,11 @@
       <groupId>org.drools</groupId>
       <artifactId>drools-compiler</artifactId>
       <version>${version.rhdm}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.fabric8</groupId>
+      <artifactId>kubernetes-client</artifactId>
+      <version>${version.kubernetes-client}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
