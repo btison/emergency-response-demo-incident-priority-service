@@ -1,10 +1,10 @@
-package com.redhat.cajun.navy.incident.priority;
+package com.redhat.emergency.response.incident.priority;
 
 import java.util.stream.StreamSupport;
 
-import com.redhat.cajun.navy.incident.priority.rules.model.AveragePriority;
-import com.redhat.cajun.navy.incident.priority.rules.model.IncidentAssignmentEvent;
-import com.redhat.cajun.navy.incident.priority.rules.model.IncidentPriority;
+import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
+import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssignmentEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
@@ -38,7 +38,7 @@ public class RulesVerticle extends AbstractVerticle {
         
         return Completable.fromMaybe(vertx.<Void>rxExecuteBlocking(future -> {
             try {
-                kbase = setupKieBase("com/redhat/cajun/navy/incident/priority/rules/priority_rules.drl");
+                kbase = setupKieBase("com/redhat/emergency/response/incident/priority/rules/priority_rules.drl");
                 initSession();
 
                 vertx.eventBus().consumer("incident-assignment-event", this::assignmentEvent);

@@ -1,4 +1,4 @@
-package com.redhat.cajun.navy.incident.priority;
+package com.redhat.emergency.response.incident.priority;
 
 import java.util.HashMap;
 import java.util.Map;

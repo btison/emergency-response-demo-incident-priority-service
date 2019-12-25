@@ -1,9 +1,9 @@
-package com.redhat.cajun.navy.incident.priority.launcher;
+package com.redhat.emergency.response.incident.priority.launcher;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import com.redhat.cajun.navy.incident.priority.MainVerticle;
+import com.redhat.emergency.response.incident.priority.MainVerticle;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Handler;

@@ -1,4 +1,4 @@
-package com.redhat.cajun.navy.incident.priority;
+package com.redhat.emergency.response.incident.priority;
 
 import io.reactivex.Completable;
 import io.vertx.config.ConfigRetrieverOptions;

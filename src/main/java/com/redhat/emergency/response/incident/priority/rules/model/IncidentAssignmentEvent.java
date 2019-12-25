@@ -1,4 +1,4 @@
-package com.redhat.cajun.navy.incident.priority.rules.model;
+package com.redhat.emergency.response.incident.priority.rules.model;
 
 public class IncidentAssignmentEvent {
 

@@ -1,4 +1,4 @@
-package com.redhat.cajun.navy.incident.priority.rules;
+package com.redhat.emergency.response.incident.priority.rules;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.instanceOf;
@@ -8,9 +8,9 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.util.stream.StreamSupport;
 
-import com.redhat.cajun.navy.incident.priority.rules.model.AveragePriority;
-import com.redhat.cajun.navy.incident.priority.rules.model.IncidentAssignmentEvent;
-import com.redhat.cajun.navy.incident.priority.rules.model.IncidentPriority;
+import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
+import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssignmentEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
 import org.drools.core.io.impl.ClassPathResource;
 import org.junit.After;
 import org.junit.Before;
@@ -40,7 +40,7 @@ public class PriorityRulesTest {
 
     @BeforeClass
     public static void init() {
-        kieBase = setupKieBase("com/redhat/cajun/navy/incident/priority/rules/priority_rules.drl");
+        kieBase = setupKieBase("com/redhat/emergency/response/incident/priority/rules/priority_rules.drl");
     }
 
     @Before
