@@ -23,7 +23,7 @@
     <version.logback>1.2.3</version.logback>
     <version.logstash>5.1</version.logstash>
     <version.junit>4.12</version.junit>
-    <vertx.verticle>com.redhat.cajun.navy.incident.priority.MainVerticle</vertx.verticle>
+    <vertx.launcher>com.redhat.cajun.navy.incident.priority.launcher.Launcher</vertx.launcher>
   </properties>
   <dependencyManagement>
     <dependencies>
