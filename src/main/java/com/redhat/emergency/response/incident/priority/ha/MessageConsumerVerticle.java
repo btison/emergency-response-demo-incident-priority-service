@@ -28,7 +28,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private KafkaConsumer<String, String> kafkaConsumer;
 
-    private KafkaConsumer<String, String> kafkaSecundaryConsumer;
+    private KafkaConsumer<String, String> kafkaSecondaryConsumer;
 
     private String eventTopic;
 
@@ -42,6 +42,8 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private boolean started = false;
 
+    private boolean ready = false;
+
     @Override
     public Completable rxStart() {
 
@@ -49,7 +51,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             Map<String, String> kafkaConfig = kafkaConfig();
             kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
             if (currentState.equals(State.REPLICA)) {
-                kafkaSecundaryConsumer = KafkaConsumer.create(vertx, kafkaConfig);
+                kafkaSecondaryConsumer = KafkaConsumer.create(vertx, kafkaConfig);
             }
             eventTopic = config().getString("topic-incident-assignment-event");
             controlTopic = config().getString("topic-incident-priority-control");
@@ -100,8 +102,8 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             currentState = State.LEADER;
         } else if (state.equals(State.REPLICA) ) {
             currentState = State.REPLICA;
-            if (kafkaSecundaryConsumer == null) {
-                kafkaSecundaryConsumer = KafkaConsumer.create(vertx, kafkaConfig());
+            if (kafkaSecondaryConsumer == null) {
+                kafkaSecondaryConsumer = KafkaConsumer.create(vertx, kafkaConfig());
             }
         }
         setLastProcessedKey().subscribe(this::assignAndStartConsume);
@@ -118,7 +120,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     protected Completable assignReplica() {
         return assignConsumer(kafkaConsumer, eventTopic)
-                .andThen(assignConsumer(kafkaSecundaryConsumer, controlTopic));
+                .andThen(assignConsumer(kafkaSecondaryConsumer, controlTopic));
     }
 
     protected Completable assignConsumer(KafkaConsumer<String, String> kafkaConsumer, String topic) {
@@ -154,14 +156,20 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     private void defaultProcessAsLeader() {
+        markInstanceReady();
         kafkaConsumer.handler(this::processLeader);
     }
 
     private void defaultProcessAsAReplica() {
-        System.out.println("process messages as replica. Processing key = " + processingKey + ", processing key offset =  " + processingKeyOffset);
+        log.debug("Process messages as replica. Processing key = " + processingKey + ", processing key offset = " + processingKeyOffset);
+        if (processingKey == null) {
+            markInstanceReady();
+        }
+        kafkaSecondaryConsumer.handler(this::processControlAsReplica);
+        kafkaConsumer.handler(this::processEventAsReplica);
     }
 
-    protected void processLeader(KafkaConsumerRecord<String, String> record) {
+    private void processLeader(KafkaConsumerRecord<String, String> record) {
 
         // TODO snapshot handling
         handleMessage(record);
@@ -170,6 +178,31 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
         saveOffset(record, kafkaConsumer);
         log.debug("Processed record as Leader. Topic: " + record.topic()
+                + ",  partition: " + record.partition() + ", offset: " + record.offset() + ", key: " + processingKey);
+    }
+
+    private void processControlAsReplica(KafkaConsumerRecord<String, String> record) {
+        if (record.offset() == processingKeyOffset + 1 || record.offset() == 0) {
+            lastProcessedControlOffset = record.offset();
+            processingKey = record.key();
+            processingKeyOffset = record.offset();
+        }
+        if (processingKey == null) { // empty topic
+            processingKey = record.key();
+            processingKeyOffset = record.offset();
+        }
+        saveOffset(record, kafkaSecondaryConsumer);
+    }
+
+    private void processEventAsReplica(KafkaConsumerRecord<String, String> record) {
+        handleMessage(record);
+        lastProcessedEventOffset = record.offset();
+
+        if (!ready && (processingKey == null || record.key().equals(processingKey))) {
+            markInstanceReady();
+        }
+        saveOffset(record, kafkaConsumer);
+        log.debug("Processed record as Replica. Topic: " + record.topic()
                 + ",  partition: " + record.partition() + ", offset: " + record.offset() + ", key: " + processingKey);
     }
 
@@ -221,4 +254,9 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         }));
     }
 
+    private void markInstanceReady() {
+        ready = true;
+        log.info("Instance is ready. State = " + currentState + ", Processing key = " + processingKey);
+        vertx.eventBus().send("instance-status-ready", new JsonObject());
+    }
 }
