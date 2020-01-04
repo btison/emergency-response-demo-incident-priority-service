@@ -40,8 +40,14 @@ public class MessageProducerVerticle extends AbstractVerticle {
     private void handleMessage(Message<JsonObject> message) {
         KafkaProducerRecord<String, String> record = KafkaProducerRecord.create(controlTopic, message.body().getString("id"), message.body().toString());
         kafkaProducer.rxWrite(record).subscribe(
-                () -> log.debug("Sent message to topic " + controlTopic + ". Message : " + message.body().toString()),
-                t -> log.error("Error sending message to topic " + controlTopic, t));
+                () -> {
+                    log.debug("Sent message to topic " + controlTopic + ". Message : " + message.body().toString());
+                    message.reply(new JsonObject());
+                },
+                t -> {
+                    log.error("Error sending message to topic " + controlTopic, t);
+                    message.reply(new JsonObject());
+                });
     }
 
 

@@ -233,13 +233,17 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         if (ignoreFirstMessageAfterStateChange) {
             log.debug("Ignoring first message after state change");
             ignoreFirstMessageAfterStateChange = false;
+            saveOffset(record, kafkaConsumer);
         } else {
-            handleMessage(record);
-            sendControlMessage(record.key());
-            processingKey = record.key();
-            processingKeyOffset = record.offset();
+            // pause consumption of new kafka messages until assignment is handled
+            kafkaConsumer.pause();
+            handleMessage(record).andThen(sendControlMessage(record.key())).subscribe(() -> {
+                processingKey = record.key();
+                processingKeyOffset = record.offset();
+                saveOffset(record, kafkaConsumer);
+                kafkaConsumer.resume();
+            });
         }
-        saveOffset(record, kafkaConsumer);
     }
 
     private void processControlAsReplica(KafkaConsumerRecord<String, String> record) {
@@ -266,18 +270,21 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             return;
         }
         log.debug("Processing event record as Replica. Offset: " + record.offset() + ", key: " + record.key());
-        handleMessage(record);
-        lastProcessedEventOffset = record.offset();
-
-        if (record.key().equals(processingKey)) {
-            markInstanceReady().subscribe(() -> {
-                pollControl();
-                log.debug("Switch to consume control messages");
+        // pause consumption of new kafka messages until assignment is handled
+        kafkaConsumer.pause();
+        handleMessage(record).subscribe(() -> {
+            lastProcessedEventOffset = record.offset();
+            if (record.key().equals(processingKey)) {
+                markInstanceReady().subscribe(() -> {
+                    pollControl();
+                    log.debug("Switch to consume control messages");
+                    saveOffset(record, kafkaConsumer);
+                });
+            } else {
                 saveOffset(record, kafkaConsumer);
-            });
-        } else {
-            saveOffset(record, kafkaConsumer);
-        }
+                kafkaConsumer.resume();
+            }
+        });
     }
 
     protected void saveOffset(KafkaConsumerRecord<String, String> record, KafkaConsumer<String, String> kafkaConsumer) {
@@ -286,33 +293,48 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         kafkaConsumer.getDelegate().commit(map);
     }
 
-    private void handleMessage(KafkaConsumerRecord<String, String> record) {
+    private Completable handleMessage(KafkaConsumerRecord<String, String> record) {
 
-        JsonObject message = new JsonObject(record.value());
+        return Completable.create(emitter -> {
+            JsonObject message = new JsonObject(record.value());
 
-        if (message.isEmpty()) {
-            log.warn("Message " + record.key() + " has no contents. Ignoring message");
-            return;
-        }
-        String messageType = message.getString("messageType");
-        if (!("IncidentAssignmentEvent".equals(messageType))) {
-            log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
-            return;
-        }
-        JsonObject body = message.getJsonObject("body");
-        if (body == null
-                || body.getString("incidentId") == null
-                || body.getBoolean("assignment") == null) {
-            log.warn("Message of type '" + "' has unexpected structure: " + message.toString());
-        }
-        String incidentId = message.getJsonObject("body").getString("incidentId");
-        log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'.");
+            if (message.isEmpty()) {
+                log.warn("Message " + record.key() + " has no contents. Ignoring message");
+                emitter.onComplete();
+                return;
+            }
+            String messageType = message.getString("messageType");
+            if (!("IncidentAssignmentEvent".equals(messageType))) {
+                log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
+                emitter.onComplete();
+                return;
+            }
+            JsonObject body = message.getJsonObject("body");
+            if (body == null
+                    || body.getString("incidentId") == null
+                    || body.getBoolean("assignment") == null) {
+                log.warn("Message of type '" + "' has unexpected structure: " + message.toString());
+                emitter.onComplete();
+                return;
+            }
+            String incidentId = message.getJsonObject("body").getString("incidentId");
+            log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'.");
 
-        vertx.eventBus().send("incident-assignment-event", body);
+            vertx.eventBus().rxRequest("incident-assignment-event", body)
+                .subscribe(o -> emitter.onComplete(), t -> {
+                    log.error("Exception while sending assignment event", t);
+                    emitter.onComplete();
+                });
+        });
+
     }
 
-    private void sendControlMessage(String id) {
-        vertx.eventBus().send("control-message-producer", new JsonObject().put("id", id));
+    private Completable sendControlMessage(String id) {
+        return Completable.create(emitter -> vertx.eventBus().rxRequest("control-message-producer", new JsonObject().put("id", id))
+            .subscribe(o -> emitter.onComplete(), t -> {
+                log.error("Exception while sending control message", t);
+                emitter.onComplete();
+            }));
     }
 
     private Completable setLastProcessedKey() {

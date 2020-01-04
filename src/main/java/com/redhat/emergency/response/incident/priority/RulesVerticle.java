@@ -73,6 +73,7 @@ public class RulesVerticle extends AbstractVerticle {
                 message.body().getBoolean("assignment"));
         ksession.insert(incidentAssignmentEvent);
         ksession.fireAllRules();
+        message.reply(new JsonObject());
     }
 
     private void incidentPriority(Message<JsonObject> message) {
