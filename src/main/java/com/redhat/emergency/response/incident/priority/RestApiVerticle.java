@@ -61,7 +61,8 @@ public class RestApiVerticle extends AbstractVerticle {
                 .subscribe((json) -> rc.response().setStatusCode(200).end(), rc::fail);
     }
 
-    private <T> void statusReady(Message<T> tMessage) {
+    private <T> void statusReady(Message<T> message) {
         ready = true;
+        message.reply(new JsonObject());
     }
 }

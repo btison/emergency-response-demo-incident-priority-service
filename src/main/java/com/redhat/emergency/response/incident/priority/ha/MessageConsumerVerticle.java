@@ -201,15 +201,20 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     private void defaultProcessAsLeader() {
-        markInstanceReady();
-        kafkaConsumer.handler(this::processLeader);
+        markInstanceReady().subscribe(() -> kafkaConsumer.handler(this::processLeader));
     }
 
     private void defaultProcessAsAReplica() {
         log.debug("Process messages as replica. Processing key = " + processingKey + ", processing key offset = " + processingKeyOffset);
         if (processingKey == null) {
-            markInstanceReady();
+            markInstanceReady().subscribe(this::setReplicaKafkaConsumerHandlers);
         }
+        else {
+            setReplicaKafkaConsumerHandlers();
+        }
+    }
+
+    private void setReplicaKafkaConsumerHandlers() {
         if (polledTopic.equals(PolledTopic.CONTROL)) {
             kafkaConsumer.pause();
         } else {
@@ -265,11 +270,14 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         lastProcessedEventOffset = record.offset();
 
         if (record.key().equals(processingKey)) {
-            markInstanceReady();
-            pollControl();
-            log.debug("Switch to consume control messages");
+            markInstanceReady().subscribe(() -> {
+                pollControl();
+                log.debug("Switch to consume control messages");
+                saveOffset(record, kafkaConsumer);
+            });
+        } else {
+            saveOffset(record, kafkaConsumer);
         }
-        saveOffset(record, kafkaConsumer);
     }
 
     protected void saveOffset(KafkaConsumerRecord<String, String> record, KafkaConsumer<String, String> kafkaConsumer) {
@@ -320,11 +328,17 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         }));
     }
 
-    private void markInstanceReady() {
+    private Completable markInstanceReady() {
         if (!ready) {
             ready = true;
-            log.info("Instance is ready. State = " + currentState + ", Processing key = " + processingKey);
-            vertx.eventBus().send("instance-status-ready", new JsonObject());
+            log.info("Instance is ready. State = " + currentState + ", Processing key = " + processingKey + ", Processing offset = " + processingKeyOffset);
+            return Completable.create(emitter -> vertx.eventBus().rxRequest("instance-status-ready", new JsonObject())
+                    .subscribe(objectMessage -> emitter.onComplete(), throwable -> {
+                        log.error("Exception while marking instance ready", throwable);
+                        emitter.onComplete();
+                    }));
+        } else {
+            return Completable.complete();
         }
     }
 
@@ -341,6 +355,6 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     public enum PolledTopic {
-        EVENTS, CONTROL;
+        EVENTS, CONTROL
     }
 }
