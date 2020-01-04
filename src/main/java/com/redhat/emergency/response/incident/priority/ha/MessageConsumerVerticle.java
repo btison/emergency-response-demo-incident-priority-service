@@ -44,6 +44,10 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private boolean ready = false;
 
+    private boolean ignoreFirstMessageAfterStateChange = false;
+
+    private volatile PolledTopic polledTopic = PolledTopic.CONTROL;
+
     @Override
     public Completable rxStart() {
 
@@ -66,7 +70,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     public Completable rxStop() {
         log.info("Stopping MessageConsumerVerticle");
         started = false;
-        if (currentState == State.REPLICA) {
+        if (kafkaSecondaryConsumer != null) {
             return kafkaSecondaryConsumer.rxClose().andThen(kafkaConsumer.rxClose());
         } else {
             return kafkaConsumer.rxClose();
@@ -92,8 +96,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             currentState = state;
         }
         if (started && changedState && !currentState.equals(State.BECOMING_LEADER)) {
-            // TODO updateOnRunningConsumer(state);
-            System.out.println("Update on running consumer");
+            updateOnRunningConsumer(state);
         } else if (!started) {
             started = true;
             if (state.equals(State.REPLICA)) {
@@ -109,12 +112,35 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private void updateOnRunningConsumer(State state) {
         log.info("Update on running consumer. State = " + state);
-        //stopConsume()
-        //restartConsume()
-        //enableConsume
+        ignoreFirstMessageAfterStateChange = true;
+        stopConsume();
+        Completable c = restartConsumers(state);
+        c.subscribe(() -> enableConsume(state));
     }
 
+    private void stopConsume() {
+        kafkaConsumer.pause();
+        if (kafkaSecondaryConsumer != null) {
+            kafkaSecondaryConsumer.pause();
+        }
+    }
 
+    private Completable restartConsumers(State state) {
+        kafkaConsumer.unsubscribe();
+        kafkaConsumer.close();
+        if (kafkaSecondaryConsumer != null) {
+            kafkaSecondaryConsumer.unsubscribe();
+            kafkaSecondaryConsumer.close();
+        }
+        return Completable.fromMaybe(vertx.rxExecuteBlocking(f -> {
+            Map<String, String> kafkaConfig = kafkaConfig();
+            kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
+            if (state.equals(State.REPLICA)) {
+                kafkaSecondaryConsumer = KafkaConsumer.create(vertx, kafkaConfig);
+            }
+            f.complete();
+        }));
+    }
 
     private void enableConsume(State state) {
         if (state.equals(State.LEADER)) {
@@ -184,6 +210,11 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         if (processingKey == null) {
             markInstanceReady();
         }
+        if (polledTopic.equals(PolledTopic.CONTROL)) {
+            kafkaConsumer.pause();
+        } else {
+            kafkaSecondaryConsumer.pause();
+        }
         kafkaSecondaryConsumer.handler(this::processControlAsReplica);
         kafkaConsumer.handler(this::processEventAsReplica);
     }
@@ -192,29 +223,35 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         if (!started) {
             return;
         }
-
+        log.debug("Processing event record as Leader. Offset: " + record.offset() + ", key: " + processingKey);
         // TODO snapshot handling
-        handleMessage(record);
-        sendControlMessage(record.key());
-        processingKey = record.key();
-
+        if (ignoreFirstMessageAfterStateChange) {
+            log.debug("Ignoring first message after state change");
+            ignoreFirstMessageAfterStateChange = false;
+        } else {
+            handleMessage(record);
+            sendControlMessage(record.key());
+            processingKey = record.key();
+            processingKeyOffset = record.offset();
+        }
         saveOffset(record, kafkaConsumer);
-        log.debug("Processed record as Leader. Topic: " + record.topic()
-                + ",  partition: " + record.partition() + ", offset: " + record.offset() + ", key: " + processingKey);
     }
 
     private void processControlAsReplica(KafkaConsumerRecord<String, String> record) {
         if (!started) {
             return;
         }
-        if (record.offset() == processingKeyOffset + 1 || record.offset() == 0) {
+        log.debug("Processing control record as Replica. Offset: " + record.offset() + ", key: " + record.key());
+        if (record.offset() == processingKeyOffset + 1 || processingKey == null) {
             lastProcessedControlOffset = record.offset();
             processingKey = record.key();
             processingKeyOffset = record.offset();
+            pollEvents();
+            log.debug("Switch to consume events");
         }
-        if (processingKey == null) { // empty topic
-            processingKey = record.key();
-            processingKeyOffset = record.offset();
+        else if (record.offset() == processingKeyOffset) {
+            pollEvents();
+            log.debug("Switch to consume events");
         }
         saveOffset(record, kafkaSecondaryConsumer);
     }
@@ -223,15 +260,16 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         if (!started) {
             return;
         }
+        log.debug("Processing event record as Replica. Offset: " + record.offset() + ", key: " + record.key());
         handleMessage(record);
         lastProcessedEventOffset = record.offset();
 
-        if (!ready && (processingKey == null || record.key().equals(processingKey))) {
+        if (record.key().equals(processingKey)) {
             markInstanceReady();
+            pollControl();
+            log.debug("Switch to consume control messages");
         }
         saveOffset(record, kafkaConsumer);
-        log.debug("Processed record as Replica. Topic: " + record.topic()
-                + ",  partition: " + record.partition() + ", offset: " + record.offset() + ", key: " + processingKey);
     }
 
     protected void saveOffset(KafkaConsumerRecord<String, String> record, KafkaConsumer<String, String> kafkaConsumer) {
@@ -283,8 +321,26 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     private void markInstanceReady() {
-        ready = true;
-        log.info("Instance is ready. State = " + currentState + ", Processing key = " + processingKey);
-        vertx.eventBus().send("instance-status-ready", new JsonObject());
+        if (!ready) {
+            ready = true;
+            log.info("Instance is ready. State = " + currentState + ", Processing key = " + processingKey);
+            vertx.eventBus().send("instance-status-ready", new JsonObject());
+        }
+    }
+
+    protected void pollControl(){
+        polledTopic = PolledTopic.CONTROL;
+        kafkaConsumer.pause();
+        kafkaSecondaryConsumer.resume();
+    }
+
+    protected void pollEvents(){
+        polledTopic = PolledTopic.EVENTS;
+        kafkaSecondaryConsumer.pause();
+        kafkaConsumer.resume();
+    }
+
+    public enum PolledTopic {
+        EVENTS, CONTROL;
     }
 }
