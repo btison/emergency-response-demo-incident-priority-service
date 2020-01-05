@@ -23,9 +23,13 @@ rule "Create incident priority fact when incident cannot be assigned"
 when
     $e: IncidentAssignmentEvent( $i: incident, assigned == false )
     not ( IncidentPriority( incident == $i ) )
+    $a: AveragePriority()
 then
     logger.debug($i + " : " + drools.getRule().getName());
     insert( new IncidentPriority($i, $e.getLat(), $e.getLon()) );
+    modify ( $a ) {
+      add()
+    }
 end
 
 rule "Update priority zone fact for an adjusted zone"
@@ -141,7 +145,7 @@ then
         setPriority( $p.getPriority() + 1 )
     }
     modify ( $a ) {
-        setNeedsEvaluation(true)
+        accumulate(1)
     }
     retract( $e );
     logger.debug($i + " : Priority = " + $p.getPriority());
@@ -155,36 +159,11 @@ when
     $a: AveragePriority()
 then
     logger.debug($i + " : " + drools.getRule().getName());
+    modify ( $a ) {
+        reverse( $p.getPriority() )
+    }
     retract ( $p );
     retract ( $e );
-    modify ( $a ) {
-        setNeedsEvaluation(true)
-    }
-end
-
-rule "Average Priority"
-when
-    $a: AveragePriority( needsEvaluation == true )
-    IncidentPriority()
-    accumulate( IncidentPriority( $p: priority );  $avg: average( $p ) )
-then
-    modify ( $a ) {
-        setNeedsEvaluation(false),
-        setAveragePriority($avg)
-    }
-    logger.debug("Average Priority: " + $a.getAveragePriority());
-end
-
-rule "Average Priority when no IncidentPriority"
-when
-    $a: AveragePriority( needsEvaluation == true )
-    not ( IncidentPriority() )
-then
-    modify ( $a ) {
-        setNeedsEvaluation(false),
-        setAveragePriority(0.0)
-    }
-    logger.debug("Average Priority: " + $a.getAveragePriority());
 end
 
 query "incidentPriority" (String i)

@@ -52,7 +52,7 @@ public class PriorityRulesTest {
     public void setupTest() {
         session = kieBase.newKieSession();
         Logger logger = LoggerFactory.getLogger("PriorityRules");
-        Integer priorityZoneUpsurge = Integer.valueOf(50);
+        Integer priorityZoneUpsurge = 50;
         session.setGlobal("logger", logger);
         session.setGlobal("priorityZoneUpsurge", priorityZoneUpsurge);
     }
@@ -109,7 +109,7 @@ public class PriorityRulesTest {
         assertThat(row, notNullValue());
         assertThat(row.get("averagePriority"), notNullValue());
         assertThat(row.get("averagePriority"), is(instanceOf(AveragePriority.class)));
-        assertThat(((AveragePriority)row.get("averagePriority")).getAveragePriority(), equalTo(1.0));
+        assertThat(((AveragePriority)row.get("averagePriority")).getResult(), equalTo(1.0));
         QueryResults incidents = session.getQueryResults("incidents");
         assertThat(incidents.size(), equalTo(1));
     }
@@ -118,13 +118,15 @@ public class PriorityRulesTest {
     public void testAveragePriority2() {
         session.insert(new IncidentAssignmentEvent("incident123", false, BigDecimal.ZERO, BigDecimal.ZERO));
         session.fireAllRules();
+        session.insert(new IncidentAssignmentEvent("incident123", false, BigDecimal.ZERO, BigDecimal.ZERO));
+        session.fireAllRules();
         QueryResults results = session.getQueryResults("averagePriority");
         assertThat(results.size(), equalTo(1));
         QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
         assertThat(row, notNullValue());
         assertThat(row.get("averagePriority"), notNullValue());
         assertThat(row.get("averagePriority"), is(instanceOf(AveragePriority.class)));
-        assertThat(((AveragePriority)row.get("averagePriority")).getAveragePriority(), equalTo(1.0));
+        assertThat(((AveragePriority)row.get("averagePriority")).getResult(), equalTo(2.0));
         QueryResults incidents = session.getQueryResults("incidents");
         assertThat(incidents.size(), equalTo(1));
     }
@@ -141,7 +143,7 @@ public class PriorityRulesTest {
         assertThat(row, notNullValue());
         assertThat(row.get("averagePriority"), notNullValue());
         assertThat(row.get("averagePriority"), is(instanceOf(AveragePriority.class)));
-        assertThat(((AveragePriority)row.get("averagePriority")).getAveragePriority(), equalTo(0.0));
+        assertThat(((AveragePriority)row.get("averagePriority")).getResult(), equalTo(0.0));
         QueryResults incidents = session.getQueryResults("incidents");
         assertThat(incidents.size(), equalTo(0));
     }
@@ -150,6 +152,25 @@ public class PriorityRulesTest {
     public void testAveragePriority4() {
         session.insert(new IncidentAssignmentEvent("incident123", false, BigDecimal.ZERO, BigDecimal.ZERO));
         session.fireAllRules();
+        session.insert(new IncidentAssignmentEvent("incident123", false, BigDecimal.ZERO, BigDecimal.ZERO));
+        session.fireAllRules();
+        session.insert(new IncidentAssignmentEvent("incident123", true, BigDecimal.ZERO, BigDecimal.ZERO));
+        session.fireAllRules();
+        QueryResults results = session.getQueryResults("averagePriority");
+        assertThat(results.size(), equalTo(1));
+        QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+        assertThat(row, notNullValue());
+        assertThat(row.get("averagePriority"), notNullValue());
+        assertThat(row.get("averagePriority"), is(instanceOf(AveragePriority.class)));
+        assertThat(((AveragePriority)row.get("averagePriority")).getResult(), equalTo(0.0));
+        QueryResults incidents = session.getQueryResults("incidents");
+        assertThat(incidents.size(), equalTo(0));
+    }
+
+    @Test
+    public void testAveragePriority5() {
+        session.insert(new IncidentAssignmentEvent("incident123", false, BigDecimal.ZERO, BigDecimal.ZERO));
+        session.fireAllRules();
         session.insert(new IncidentAssignmentEvent("incident456", false, BigDecimal.ZERO, BigDecimal.ZERO));
         session.fireAllRules();
         QueryResults results = session.getQueryResults("averagePriority");
@@ -158,13 +179,13 @@ public class PriorityRulesTest {
         assertThat(row, notNullValue());
         assertThat(row.get("averagePriority"), notNullValue());
         assertThat(row.get("averagePriority"), is(instanceOf(AveragePriority.class)));
-        assertThat(((AveragePriority)row.get("averagePriority")).getAveragePriority(), equalTo(1.0));
+        assertThat(((AveragePriority)row.get("averagePriority")).getResult(), equalTo(1.0));
         QueryResults incidents = session.getQueryResults("incidents");
         assertThat(incidents.size(), equalTo(2));
     }
 
     @Test
-    public void testAveragePriority5() {
+    public void testAveragePriority6() {
         session.insert(new IncidentAssignmentEvent("incident123", false, BigDecimal.ZERO, BigDecimal.ZERO));
         session.fireAllRules();
         session.insert(new IncidentAssignmentEvent("incident456", false, BigDecimal.ZERO, BigDecimal.ZERO));
@@ -177,13 +198,13 @@ public class PriorityRulesTest {
         assertThat(row, notNullValue());
         assertThat(row.get("averagePriority"), notNullValue());
         assertThat(row.get("averagePriority"), is(instanceOf(AveragePriority.class)));
-        assertThat(((AveragePriority)row.get("averagePriority")).getAveragePriority(), equalTo(1.5));
+        assertThat(((AveragePriority)row.get("averagePriority")).getResult(), equalTo(1.5));
         QueryResults incidents = session.getQueryResults("incidents");
         assertThat(incidents.size(), equalTo(2));
     }
 
     @Test
-    public void testAveragePriority6() {
+    public void testAveragePriority7() {
         session.insert(new IncidentAssignmentEvent("incident123", false, BigDecimal.ZERO, BigDecimal.ZERO));
         session.fireAllRules();
         session.insert(new IncidentAssignmentEvent("incident456", false, BigDecimal.ZERO, BigDecimal.ZERO));
@@ -198,20 +219,20 @@ public class PriorityRulesTest {
         assertThat(row, notNullValue());
         assertThat(row.get("averagePriority"), notNullValue());
         assertThat(row.get("averagePriority"), is(instanceOf(AveragePriority.class)));
-        assertThat(((AveragePriority)row.get("averagePriority")).getAveragePriority(), equalTo(2.0));
+        assertThat(((AveragePriority)row.get("averagePriority")).getResult(), equalTo(2.0));
         QueryResults incidents = session.getQueryResults("incidents");
         assertThat(incidents.size(), equalTo(1));
     }
 
     @Test
     public void testPriorityZoneAddedBeforeIncident() {
-        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal("34.19439"), new BigDecimal("-77.81453"), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone));
         session.fireAllRules();
         PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal(0), new BigDecimal(0), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone2));
         session.fireAllRules();
-        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false,  new BigDecimal(34.19439), new BigDecimal(-77.81453)));
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false,  new BigDecimal("34.19439"), new BigDecimal("-77.81453")));
         session.fireAllRules();
         QueryResults results = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
         assertThat(results.size(), equalTo(1));
@@ -225,13 +246,13 @@ public class PriorityRulesTest {
 
     @Test
     public void testPriorityZoneAddedAfterIncident() {
-        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e44", false, new BigDecimal(0), new BigDecimal(-77.81453)));
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e44", false, new BigDecimal(0), new BigDecimal("-77.81453")));
         session.fireAllRules();
-        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal(34.19439), new BigDecimal(-77.81453)));
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal("34.19439"), new BigDecimal("-77.81453")));
         session.fireAllRules();
-        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e45", false, new BigDecimal(0), new BigDecimal(-77.81453)));
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e45", false, new BigDecimal(0), new BigDecimal("-77.81453")));
         session.fireAllRules();
-        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal("34.19439"), new BigDecimal("-77.81453"), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone));
         session.fireAllRules();
         QueryResults results = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
@@ -245,10 +266,10 @@ public class PriorityRulesTest {
 
     @Test
     public void testPriorityZoneClearEvent() {
-        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal("34.19439"), new BigDecimal("-77.81453"), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone));
         session.fireAllRules();
-        PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal("34.19439"), new BigDecimal("-77.81453"), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone2));
         session.fireAllRules();
         session.insert(new PriorityZoneClearEvent());
@@ -259,10 +280,10 @@ public class PriorityRulesTest {
 
     @Test
     public void testPriorityZoneDeEscalation() {
-        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal("34.19439"), new BigDecimal("-77.81453"), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone));
         session.fireAllRules();
-        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal(34.19439), new BigDecimal(-77.81453)));
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal("34.19439"), new BigDecimal("-77.81453")));
         session.fireAllRules();
 
         //make sure incident gets escalated
@@ -288,15 +309,15 @@ public class PriorityRulesTest {
     @Test
     public void testSkipDeEscalationWhenInMultiplePriorityZones() {
         //Add two priority zones in the same spot
-        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal("34.19439"), new BigDecimal("-77.81453"), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone));
         session.fireAllRules();
-        PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal("34.19439"), new BigDecimal("-77.81453"), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone2));
         session.fireAllRules();
 
         //Add an incident that falls in both
-        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal(34.19439), new BigDecimal(-77.81453)));
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal("34.19439"), new BigDecimal("-77.81453")));
         session.fireAllRules();
 
         //make sure incident gets escalated

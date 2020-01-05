@@ -125,7 +125,7 @@ public class RulesVerticle extends AbstractVerticle {
         if (row == null) {
             average = 0.0;
         } else {
-            average = ((AveragePriority)row.get("averagePriority")).getAveragePriority();
+            average = ((AveragePriority)row.get("averagePriority")).getResult();
         }
 
         results = ksession.getQueryResults("incidents");

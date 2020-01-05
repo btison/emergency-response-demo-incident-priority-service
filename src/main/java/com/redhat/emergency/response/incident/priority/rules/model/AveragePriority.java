@@ -2,28 +2,43 @@ package com.redhat.emergency.response.incident.priority.rules.model;
 
 public class AveragePriority {
 
-    private Double averagePriority;
+    private int count;
 
-    private boolean needsEvaluation;
+    private double total;
 
     public AveragePriority() {
-        averagePriority = 0.0;
-        needsEvaluation = false;
+        total = 0.0;
     }
 
-    public Double getAveragePriority() {
-        return averagePriority;
+    public void accumulate(Number value) {
+        if (value != null) {
+            this.total += value.doubleValue();
+        }
     }
 
-    public void setAveragePriority(Double averagePriority) {
-        this.averagePriority = averagePriority;
+    public void reverse(Number value) {
+        if (value != null) {
+            this.count--;
+            this.total -= value.doubleValue();
+        }
+        if (count == 0) {
+            total = 0.0;
+        }
     }
 
-    public boolean isNeedsEvaluation() {
-        return needsEvaluation;
+    public void add() {
+        this.count++;
     }
 
-    public void setNeedsEvaluation(boolean needsEvaluation) {
-        this.needsEvaluation = needsEvaluation;
+    public void retract() {
+        this.count--;
+    }
+
+    public Double getResult() {
+        if (count == 0) {
+            return 0.0;
+        } else {
+            return total / count;
+        }
     }
 }
