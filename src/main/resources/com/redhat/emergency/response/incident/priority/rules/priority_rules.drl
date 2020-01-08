@@ -1,9 +1,9 @@
-package com.redhat.cajun.navy.incident.priority.rules
+package com.redhat.emergency.response.incident.priority.rules
 
-import com.redhat.cajun.navy.incident.priority.rules.model.IncidentAssignmentEvent;
-import com.redhat.cajun.navy.incident.priority.rules.model.IncidentReportedEvent;
-import com.redhat.cajun.navy.incident.priority.rules.model.IncidentPriority;
-import com.redhat.cajun.navy.incident.priority.rules.model.AveragePriority;
+import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssignmentEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.IncidentReportedEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
+import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
 
 global org.slf4j.Logger logger;
 
