@@ -21,7 +21,7 @@ public class BootstrapVerticle extends AbstractVerticle {
         GlobalState.init(vertx);
         Single<String> single;
         if (config().getBoolean("running-on-kubernetes")) {
-            coreKube = new CoreKube(config().getString("leader-configmap"));
+            coreKube = new CoreKube(config());
             single = vertx.rxDeployVerticle(new LeaderElectionVerticle(coreKube.getKubernetesClient(), coreKube.getConfiguration(), null));
         } else {
             single = Single.just("");

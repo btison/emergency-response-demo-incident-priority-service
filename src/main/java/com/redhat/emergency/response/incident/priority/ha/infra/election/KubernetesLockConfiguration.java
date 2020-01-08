@@ -4,13 +4,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.vertx.core.json.JsonObject;
 
 public class KubernetesLockConfiguration {
 
+    public static final String DEFAULT_LEADER_ELECTION_CONFIGMAP = "incident-priority-service-leaders";
     public static final double DEFAULT_JITTER_FACTOR = 1.2;
-    public static final long DEFAULT_LEASE_DURATION_MILLIS = 30000;
-    public static final long DEFAULT_RENEW_DEADLINE_MILLIS = 20000;
+    public static final long DEFAULT_LEASE_DURATION_MILLIS = 5000;
     public static final long DEFAULT_RETRY_PERIOD_MILLIS = 5000;
+    public static final String DEFAULT_GROUP_NAME = "incident-priority";
 
     /**
      * Name of the current pod (defaults to host name).
@@ -35,26 +37,25 @@ public class KubernetesLockConfiguration {
     /**
      * A jitter factor to apply in order to prevent all pods to call Kubernetes APIs in the same instant.
      */
-    private double jitterFactor = DEFAULT_JITTER_FACTOR;
+    private double jitterFactor;
 
     /**
      * The default duration of the lease for the current leader.
      */
-    private long leaseDurationMillis = DEFAULT_LEASE_DURATION_MILLIS;
-
-    /**
-     * The deadline after which the leader must stop its services because it may have lost the leadership.
-     */
-    private long renewDeadlineMillis = DEFAULT_RENEW_DEADLINE_MILLIS;
+    private long leaseDurationMillis;
 
     /**
      * The time between two subsequent attempts to check and acquire the leadership.
      * It is randomized using the jitter factor.
      */
-    private long retryPeriodMillis = DEFAULT_RETRY_PERIOD_MILLIS;
+    private long retryPeriodMillis;
 
-    public KubernetesLockConfiguration(String configMapName) {
-        this.configMapName = configMapName;
+    public KubernetesLockConfiguration(JsonObject config) {
+        this.configMapName = config.getString("leader-configmap", DEFAULT_LEADER_ELECTION_CONFIGMAP);
+        this.jitterFactor = config.getDouble("jitter-factor", DEFAULT_JITTER_FACTOR);
+        this.retryPeriodMillis = config.getLong("retry-period-millis", DEFAULT_RETRY_PERIOD_MILLIS);
+        this.leaseDurationMillis = config.getLong("lease-duration-millis", DEFAULT_LEASE_DURATION_MILLIS);
+        this.groupName = config.getString("group-name", DEFAULT_GROUP_NAME);
     }
 
     public String getPodName() {
@@ -77,47 +78,20 @@ public class KubernetesLockConfiguration {
         return clusterLabels;
     }
 
-    public void setClusterLabels(Map<String, String> clusterLabels) {
-        this.clusterLabels = clusterLabels;
-    }
-
     public String getGroupName() {
         return groupName;
-    }
-
-    public void setGroupName(String groupName) {
-        this.groupName = groupName;
     }
 
     public double getJitterFactor() {
         return jitterFactor;
     }
 
-    public void setJitterFactor(double jitterFactor) {
-        this.jitterFactor = jitterFactor;
-    }
-
     public long getLeaseDurationMillis() {
         return leaseDurationMillis;
-    }
-
-    public void setLeaseDurationMillis(long leaseDurationMillis) {
-        this.leaseDurationMillis = leaseDurationMillis;
-    }
-
-    public long getRenewDeadlineMillis() {
-        return renewDeadlineMillis;
-    }
-
-    public void setRenewDeadlineMillis(long renewDeadlineMillis) {
-        this.renewDeadlineMillis = renewDeadlineMillis;
     }
 
     public long getRetryPeriodMillis() {
         return retryPeriodMillis;
     }
 
-    public void setRetryPeriodMillis(long retryPeriodMillis) {
-        this.retryPeriodMillis = retryPeriodMillis;
-    }
 }

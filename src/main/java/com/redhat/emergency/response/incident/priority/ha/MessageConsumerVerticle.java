@@ -235,12 +235,14 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         if (!started) {
             return;
         }
-        log.debug("Processing event record as Leader. Offset: " + record.offset() + ", key: " + processingKey);
+        log.debug("Processing event record as Leader. Offset: " + record.offset() + ", key: " + record.key()
+                + ", processingKey = " + processingKey);
         // TODO snapshot handling
         if (ignoreFirstMessageAfterStateChange) {
             log.debug("Ignoring first message after state change");
             ignoreFirstMessageAfterStateChange = false;
             saveOffset(record, kafkaConsumer);
+            ignoreFirstMessageAfterStateChange = false;
         } else {
             // pause consumption of new kafka messages until assignment is handled
             kafkaConsumer.pause();

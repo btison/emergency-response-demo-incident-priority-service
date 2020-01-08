@@ -3,6 +3,7 @@ package com.redhat.emergency.response.incident.priority.ha;
 import com.redhat.emergency.response.incident.priority.ha.infra.election.KubernetesLockConfiguration;
 import io.fabric8.kubernetes.client.DefaultKubernetesClient;
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.vertx.core.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,12 +13,12 @@ public class CoreKube {
     private KubernetesClient kubernetesClient ;
     private KubernetesLockConfiguration configuration;
 
-    public CoreKube(String leaderConfigMap) {
+    public CoreKube(JsonObject config) {
         kubernetesClient = new DefaultKubernetesClient();
-        configuration = createKubeConfiguration(leaderConfigMap);
+        configuration = createKubeConfiguration(config);
     }
 
-    private KubernetesLockConfiguration createKubeConfiguration(String leaderConfigmap) {
+    private KubernetesLockConfiguration createKubeConfiguration(JsonObject config) {
         String podName = System.getenv("POD_NAME");
         if (podName == null) {
             podName = System.getenv("HOSTNAME");
@@ -25,7 +26,7 @@ public class CoreKube {
         if (logger.isInfoEnabled()) {
             logger.info("PodName: {}", podName);
         }
-        KubernetesLockConfiguration configuration = new KubernetesLockConfiguration(leaderConfigmap);
+        KubernetesLockConfiguration configuration = new KubernetesLockConfiguration(config);
         configuration.setPodName(podName);
         return configuration;
     }
