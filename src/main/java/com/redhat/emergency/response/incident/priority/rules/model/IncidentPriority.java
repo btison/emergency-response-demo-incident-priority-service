@@ -13,6 +13,7 @@ public class IncidentPriority {
     public IncidentPriority(String incident) {
         this.incident = incident;
         this.priority = 0;
+        this.escalated = false;
         this.needsEscalation = false;
     }
 

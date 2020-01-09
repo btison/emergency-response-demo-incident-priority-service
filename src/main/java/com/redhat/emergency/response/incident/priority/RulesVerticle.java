@@ -82,6 +82,7 @@ public class RulesVerticle extends AbstractVerticle {
         ksession.insert(incidentAssignmentEvent);
         ksession.fireAllRules();
 
+        //TODO: Avoid this step if possible as it may impact performance
         if (! message.body().getBoolean("assignment")) {
             checkPriorityZones(message.body().getString("incidentId"));
         }
