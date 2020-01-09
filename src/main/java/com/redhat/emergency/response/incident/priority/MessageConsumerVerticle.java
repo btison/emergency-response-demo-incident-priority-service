@@ -17,6 +17,10 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private KafkaConsumer<String, String> kafkaConsumer;
 
+    private final String topicIncidentEvent = "topic-incident-event";
+
+    private final String topicPriorityZoneEvent = "topic-priority-zone-event";
+
     @Override
     public Completable rxStart() {
 
@@ -30,13 +34,29 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             kafkaConfig.put("enable.auto.commit", "false");
             kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
             kafkaConsumer.handler(this::handleMessage);
-            kafkaConsumer.subscribe(config().getString("topic-incident-assignment-event"));
+            kafkaConsumer.subscribe(topicIncidentEvent);
+            kafkaConsumer.subscribe(topicPriorityZoneEvent);
             future.complete();
         }));
     }
 
     private void handleMessage(KafkaConsumerRecord<String, String> msg) {
+        switch(msg.topic()){
+            case topicIncidentEvent:
+                handleIncidentEventMessage(msg);
+                break;
+            case topicPriorityZoneEvent:
+                handlePriorityZoneEventMessage(msg);
+                break;
+            default:
+                log.debug("Unsupported message topic: {}", msg.topic());
+        }
+        if (msg.topic().equals(topicIncidentEvent)) {
+            handleIncidentEventMessage(msg);
+        } 
+    }
 
+    private void handleIncidentEventMessage(KafkaConsumerRecord<String, String> msg) {
         try {
             JsonObject message = new JsonObject(msg.value());
 
@@ -60,6 +80,38 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                     + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
 
             vertx.eventBus().send("incident-assignment-event", body);
+
+        } finally {
+            //commit message
+            kafkaConsumer.commit();
+        }
+    }
+
+    private void handlePriorityZoneEventMessage(KafkaConsumerRecord<String, String> msg) {
+        try {
+            JsonObject message = new JsonObject(msg.value());
+
+            if (message.isEmpty()) {
+                log.warn("Message " + msg.key() + " has no contents. Ignoring message");
+                return;
+            }
+            String messageType = message.getString("messageType");
+            if (!("PriorityZoneApplicationEvent".equals(messageType))) {
+                log.debug("Unexpected message type '{}' in message {}. Ignoring message", messageType, message);
+                return;
+            }
+            JsonObject body = message.getJsonObject("body");
+            if (body == null
+                    || body.getString("id") == null
+                    || body.getDouble("lat") == null
+                    || body.getDouble("lon") == null
+                    || body.getDouble("radius") == null) {
+                log.warn("Message of type '{}' has unexpected structure: {}", messageType, message);
+            }
+            log.debug("Consumed '{}' message for priorityZone '{}'. Topic: {}} ,  partition: {}}, offset: {}", 
+                messageType, body.getString("id"), msg.topic(), msg.partition(), msg.offset());
+
+            vertx.eventBus().send("priority-zone-application-event", body);
 
         } finally {
             //commit message

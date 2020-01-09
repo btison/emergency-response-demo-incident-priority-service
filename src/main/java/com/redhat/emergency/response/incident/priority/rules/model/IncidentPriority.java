@@ -6,9 +6,14 @@ public class IncidentPriority {
 
     private Integer priority;
 
+    private boolean needsEscalation;
+
+    private boolean escalated;
+
     public IncidentPriority(String incident) {
         this.incident = incident;
         this.priority = 0;
+        this.needsEscalation = false;
     }
 
     public String getIncident() {
@@ -25,5 +30,22 @@ public class IncidentPriority {
 
     public void setPriority(Integer priority) {
         this.priority = priority;
+    }
+
+
+    public boolean getNeedsEscalation() {
+        return needsEscalation;
+    }
+
+    public void setNeedsEscalation(boolean needsEscalation) {
+        this.needsEscalation = needsEscalation;
+    }
+
+    public boolean getEscalated() {
+        return escalated;
+    }
+
+    public void setEscalated(boolean escalated) {
+        this.escalated = escalated;
     }
 }

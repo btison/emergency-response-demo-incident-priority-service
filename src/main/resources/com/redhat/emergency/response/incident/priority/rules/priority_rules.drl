@@ -23,6 +23,38 @@ then
     insert( new IncidentPriority($i) );
 end
 
+rule "Create priority zone fact for a newly placed zone"
+when
+    $e: PriorityZoneApplicationEvent()
+    not ( PriorityZone( id == $e.getPriorityZone().getId() ) )
+then 
+    logger.debug($i + " : " + drools.getRule().getName());
+    insert( $e.getPriorityZone() )
+
+rule "Update priority zone fact for an adjusted zone"
+when
+    $e: PriorityZoneApplicationEvent()
+    $z: PriorityZone( id == $e.getPriorityZone().getId() )
+then
+    logger.debug($i + " : " + drools.getRule().getName());
+    modify ( $z ) {
+        $z.setLat( $e.getPriorityZone().getLat() )
+        $z.setLon( $e.getPriorityZone().getLon() )
+        $z.setRadius( $e.getPriorityZone().getRadius() )
+    }
+    retract( $e );
+
+rule "Escalate the priority of incidents which fall within a priority zone"
+when
+    $p: IncidentPriority( needsEscalation == true )
+then
+    logger.debug($i + " : " + drools.getRule().getName());
+    modify ( $p ) {
+        setNeedsEscalation( false )
+        setEscalated( true )
+        setPriority( $p.getPriority() + 10 )
+    }
+
 rule "Increase priority by one when incident cannot be assigned"
 when
     $e: IncidentAssignmentEvent( $i: incident, assigned == false )
@@ -84,10 +116,18 @@ query "incidentPriority" (String i)
    incidentPriority : IncidentPriority( incident == i )
 end
 
+query "priorityZone" (String i)
+   priorityZone: PriorityZone( id == i )
+end
+
 query "averagePriority"
    averagePriority : AveragePriority( )
 end
 
 query "incidents"
    incidentPriority: IncidentPriority()
+end
+
+query "priorityZones"
+    priorityZone: PriorityZone()
 end
