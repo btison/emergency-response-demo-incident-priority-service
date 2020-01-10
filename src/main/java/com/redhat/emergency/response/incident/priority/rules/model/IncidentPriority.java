@@ -1,8 +1,6 @@
 package com.redhat.emergency.response.incident.priority.rules.model;
 
-import io.vertx.ext.web.client.WebClient;
-import io.vertx.core.Vertx;
-import io.vertx.core.json.JsonObject;
+import java.math.BigDecimal;
 
 public class IncidentPriority {
 
@@ -14,17 +12,17 @@ public class IncidentPriority {
 
     private boolean escalated;
 
-    private double lat;
+    private BigDecimal lat;
 
-    private double lon;
+    private BigDecimal lon;
 
-    public IncidentPriority(String incident) {
+    public IncidentPriority(String incident, BigDecimal lat, BigDecimal lon) {
         this.incident = incident;
         this.priority = 0;
         this.escalated = false;
         this.needsEscalation = false;
-
-        // retrieveCoordinates();
+        this.lat = lat;
+        this.lon = lon;
     }
 
     public String getIncident() {
@@ -60,41 +58,19 @@ public class IncidentPriority {
         this.escalated = escalated;
     }
 
-    public double getLat() {
+    public BigDecimal getLat() {
         return this.lat;
     }
 
-    public void setLat(double lat) {
+    public void setLat(BigDecimal lat) {
         this.lat = lat;
     }
 
-    public double getLon() {
+    public BigDecimal getLon() {
         return this.lon;
     }
 
-    public void setLon(double lon) {
+    public void setLon(BigDecimal lon) {
         this.lon = lon;
-    }
-
-    private void retrieveCoordinates() {
-        String incidentUrl = Vertx.currentContext().config().getString("incident-service");
-        if (incidentUrl == null) {
-            incidentUrl = "http://user4-incident-service.apps.cluster-e222.e222.example.opentlc.com/";
-        }
-
-        WebClient client = WebClient.create(Vertx.currentContext().owner());
-        client.get(incidentUrl + "/incidents/incident/" + incident)
-            .send(ar -> {
-                if (ar.succeeded()) {
-                    JsonObject response = ar.result().bodyAsJsonObject();
-              
-                    this.lat = Double.parseDouble(response.getString("lat"));
-                    this.lon = Double.parseDouble(response.getString("lon"));
-                  } else {
-                    System.out.println("Something went wrong " + ar.cause().getMessage());
-                  }
-            });
-
-        client.close();
     }
 }

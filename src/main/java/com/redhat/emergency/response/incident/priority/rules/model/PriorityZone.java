@@ -1,16 +1,18 @@
 package com.redhat.emergency.response.incident.priority.rules.model;
 
+import java.math.BigDecimal;
+
 public class PriorityZone {
 
     private String id;
 
-    private double lat;
+    private BigDecimal lat;
 
-    private double lon;
+    private BigDecimal lon;
 
-    private double radius;
+    private BigDecimal radius;
 
-    public PriorityZone(String id, double lat, double lon, double radius) {
+    public PriorityZone(String id, BigDecimal lat, BigDecimal lon, BigDecimal radius) {
         this.id = id;
         this.lat = lat;
         this.lon = lon;
@@ -25,27 +27,27 @@ public class PriorityZone {
         this.id = id;
     }
 
-    public double getLat() {
+    public BigDecimal getLat() {
         return this.lat;
     }
 
-    public void setLat(double lat) {
+    public void setLat(BigDecimal lat) {
         this.lat = lat;
     }
 
-    public double getLon() {
+    public BigDecimal getLon() {
         return this.lon;
     }
 
-    public void setLon(double lon) {
+    public void setLon(BigDecimal lon) {
         this.lon = lon;
     }
 
-    public double getRadius() {
+    public BigDecimal getRadius() {
         return this.radius;
     }
 
-    public void setRadius(double radius) {
+    public void setRadius(BigDecimal radius) {
         this.radius = radius;
     }
 

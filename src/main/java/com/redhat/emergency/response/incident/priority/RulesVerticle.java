@@ -1,5 +1,6 @@
 package com.redhat.emergency.response.incident.priority;
 
+import java.math.BigDecimal;
 import java.util.stream.StreamSupport;
 
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
@@ -75,7 +76,7 @@ public class RulesVerticle extends AbstractVerticle {
         log.debug("AssignmentEvent - received message: " + message.body().toString());
 
         IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
-                message.body().getBoolean("assignment"));
+                message.body().getBoolean("assignment"), new BigDecimal(message.body().getString("lat")), new BigDecimal(message.body().getString("lon")));
         ksession.insert(incidentAssignmentEvent);
         ksession.fireAllRules();
     }
@@ -114,9 +115,9 @@ public class RulesVerticle extends AbstractVerticle {
     private void priorityZone(Message<JsonObject> message) {
         log.debug("PriorityZoneApplicationEvent - received message {}", message.body());
         String id = message.body().getString("id");
-        double lat = message.body().getDouble("lat");
-        double lon = message.body().getDouble("lon");
-        double radius = message.body().getDouble("radius");
+        BigDecimal lat = new BigDecimal(message.body().getString("lat"));
+        BigDecimal lon = new BigDecimal(message.body().getString("lon"));
+        BigDecimal radius = new BigDecimal(message.body().getString("radius"));
 
         PriorityZone priorityZone = new PriorityZone(id, lat, lon, radius);
         PriorityZoneApplicationEvent event = new PriorityZoneApplicationEvent(priorityZone);

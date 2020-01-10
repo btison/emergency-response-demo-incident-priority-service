@@ -8,6 +8,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneA
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 import com.redhat.emergency.response.incident.priority.rules.model.ProximityEvaluator;
 
+
 global org.slf4j.Logger logger;
 
 rule "Create AveragePriority fact"
@@ -30,7 +31,7 @@ when
     not ( IncidentPriority( incident == $i ) )
 then
     logger.debug($i + " : " + drools.getRule().getName());
-    insert( new IncidentPriority($i) );
+    insert( new IncidentPriority($i, $e.getLat(), $e.getLon()) );
 end
 
 rule "Update priority zone fact for an adjusted zone"
@@ -64,7 +65,7 @@ when
 then
     logger.debug($z.getId() + " : " + $p.getIncident() + " : " + drools.getRule().getName());
     modify ( $p ) {
-        setNeedsEscalation($x.inPriorityZone($p.getIncident(), $z))
+        setNeedsEscalation($x.inPriorityZone($p, $z))
     }
     retract( $e );
 end
@@ -78,7 +79,7 @@ when
 then
     logger.debug($z.getId() + " : " + $p.getIncident() + " : " + drools.getRule().getName());
     modify ( $p ) {
-        setNeedsEscalation($x.inPriorityZone($p.getIncident(), $z))
+        setNeedsEscalation($x.inPriorityZone($p, $z))
     }
 end
 

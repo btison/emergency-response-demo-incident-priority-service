@@ -1,33 +1,22 @@
 package com.redhat.emergency.response.incident.priority.rules.model;
 
+import java.math.BigDecimal;
+
 public class ProximityEvaluator {
 
     public ProximityEvaluator() {
     }
 
-    public boolean inPriorityZone(String incidentId, PriorityZone priorityZone) {
-        // WebClient client = WebClient.create(Vertx.vertx());
-        // AtomicBoolean inPriorityZone = new AtomicBoolean(false);
-        // client.get("http://user4-incident-service.apps.cluster-e222.e222.example.opentlc.com/incidents/incident/" + incidentId)
-        //     .send(ar -> {
-        //         if (ar.succeeded()) {
-        //             JsonObject response = ar.result().bodyAsJsonObject();
-              
-        //             double incidentLat = Double.parseDouble(response.getString("lat"));
-        //             double incidentLon = Double.parseDouble(response.getString("lon"));
-
-        //             inPriorityZone.set(distance(incidentLat, incidentLon, priorityZone.getLat(), priorityZone.getLon(), "K") <= priorityZone.getRadius());
-        //           } else {
-        //             System.out.println("Something went wrong " + ar.cause().getMessage());
-        //           }
-        //     });
-
-        // client.close();
-        // return inPriorityZone.get();
-        double incidentLat = Double.parseDouble("34.19439");
-        double incidentLon = Double.parseDouble("-77.81453");
-
-        return distance(incidentLat, incidentLon, priorityZone.getLat(), priorityZone.getLon(), "K") <= priorityZone.getRadius();
+    public boolean inPriorityZone(IncidentPriority incident, PriorityZone priorityZone) {
+        //return true if priority zone radius is greater than the distance between the pz center and incident location
+        return priorityZone.getRadius().compareTo(
+            new BigDecimal(distance(
+                incident.getLat().doubleValue(), 
+                incident.getLon().doubleValue(), 
+                priorityZone.getLat().doubleValue(), 
+                priorityZone.getLon().doubleValue(), "K")
+            )
+         ) >= 0;
     }
 
     /**

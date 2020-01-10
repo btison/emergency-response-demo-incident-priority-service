@@ -72,7 +72,9 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             JsonObject body = message.getJsonObject("body");
             if (body == null
                     || body.getString("incidentId") == null
-                    || body.getBoolean("assignment") == null) {
+                    || body.getBoolean("assignment") == null
+                    || body.getString("lat") == null
+                    || body.getString("lon") == null) {
                 log.warn("Message of type '" + "' has unexpected structure: " + message.toString());
             }
             String incidentId = message.getJsonObject("body").getString("incidentId");
@@ -103,9 +105,9 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             JsonObject body = message.getJsonObject("body");
             if (body == null
                     || body.getString("id") == null
-                    || body.getDouble("lat") == null
-                    || body.getDouble("lon") == null
-                    || body.getDouble("radius") == null) {
+                    || body.getString("lat") == null
+                    || body.getString("lon") == null
+                    || body.getString("radius") == null) {
                 log.warn("Message of type '{}' has unexpected structure: {}", messageType, message);
             }
             log.debug("Consumed '{}' message for priorityZone '{}'. Topic: {}} ,  partition: {}}, offset: {}", 
