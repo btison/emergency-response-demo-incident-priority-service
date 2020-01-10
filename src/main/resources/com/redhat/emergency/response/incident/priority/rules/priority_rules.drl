@@ -6,6 +6,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.IncidentPrior
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
+import com.redhat.emergency.response.incident.priority.rules.model.ProximityEvaluator;
 
 global org.slf4j.Logger logger;
 
@@ -16,6 +17,13 @@ then
     insert ( new AveragePriority() );
 end
 
+rule "Create ProximityEvaluator fact"
+when
+    not ( ProximityEvaluator() )
+then
+    insert ( new ProximityEvaluator() );
+end
+
 rule "Create incident priority fact when incident cannot be assigned"
 when
     $e: IncidentAssignmentEvent( $i: incident, assigned == false )
@@ -23,15 +31,6 @@ when
 then
     logger.debug($i + " : " + drools.getRule().getName());
     insert( new IncidentPriority($i) );
-end
-
-rule "Create priority zone fact for a newly placed zone"
-when
-    $e: PriorityZoneApplicationEvent()
-    not ( PriorityZone( id == $e.getPriorityZone().getId() ) )
-then 
-    logger.debug($e.getPriorityZone().getId() + " : " + drools.getRule().getName());
-    insert( $e.getPriorityZone() );
 end
 
 rule "Update priority zone fact for an adjusted zone"
@@ -45,10 +44,45 @@ then
         setLon( $e.getPriorityZone().getLon() ),
         setRadius( $e.getPriorityZone().getRadius() )
     }
+end
+
+rule "Create priority zone fact for a newly placed zone"
+when
+    $e: PriorityZoneApplicationEvent()
+    not ( PriorityZone( id == $e.getPriorityZone().getId() ) )
+then 
+    logger.debug($e.getPriorityZone().getId() + " : " + drools.getRule().getName());
+    insert( $e.getPriorityZone() );
+end
+
+rule "Flag incidents which fall within an updated priority zone"
+when
+    $e: PriorityZoneApplicationEvent()
+    $z: PriorityZone()
+    $p: IncidentPriority( escalated == false )
+    $x: ProximityEvaluator()
+then
+    logger.debug($z.getId() + " : " + $p.getIncident() + " : " + drools.getRule().getName());
+    modify ( $p ) {
+        setNeedsEscalation($x.inPriorityZone($p.getIncident(), $z))
+    }
     retract( $e );
 end
 
-rule "Escalate the priority of incidents which fall within a priority zone"
+rule "Flag updated incident if it falls within a priority zone"
+when 
+    $e: IncidentAssignmentEvent( $i: incident, assigned == false )
+    $p: IncidentPriority( incident == $i, escalated == false )
+    $z: PriorityZone()
+    $x: ProximityEvaluator()
+then
+    logger.debug($z.getId() + " : " + $p.getIncident() + " : " + drools.getRule().getName());
+    modify ( $p ) {
+        setNeedsEscalation($x.inPriorityZone($p.getIncident(), $z))
+    }
+end
+
+rule "Escalate the priority of flagged incidents"
 when
     $p: IncidentPriority( needsEscalation == true )
     $a: AveragePriority()

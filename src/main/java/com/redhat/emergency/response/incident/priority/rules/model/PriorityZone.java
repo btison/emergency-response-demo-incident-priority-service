@@ -1,8 +1,5 @@
 package com.redhat.emergency.response.incident.priority.rules.model;
 
-import io.vertx.core.Vertx;
-import io.vertx.ext.web.client.WebClient;
-
 public class PriorityZone {
 
     private String id;

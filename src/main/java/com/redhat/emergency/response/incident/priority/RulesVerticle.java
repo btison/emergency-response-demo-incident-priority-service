@@ -1,7 +1,5 @@
 package com.redhat.emergency.response.incident.priority;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.StreamSupport;
 
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
@@ -12,7 +10,6 @@ import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneA
 
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.client.WebClient;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.eventbus.Message;
 import org.drools.core.io.impl.ClassPathResource;
@@ -81,11 +78,6 @@ public class RulesVerticle extends AbstractVerticle {
                 message.body().getBoolean("assignment"));
         ksession.insert(incidentAssignmentEvent);
         ksession.fireAllRules();
-
-        //TODO: Avoid this step if possible as it may impact performance
-        if (! message.body().getBoolean("assignment")) {
-            checkPriorityZones(message.body().getString("incidentId"));
-        }
     }
 
     private void incidentPriority(Message<JsonObject> message) {
@@ -129,16 +121,6 @@ public class RulesVerticle extends AbstractVerticle {
         PriorityZone priorityZone = new PriorityZone(id, lat, lon, radius);
         PriorityZoneApplicationEvent event = new PriorityZoneApplicationEvent(priorityZone);
         ksession.insert(event);
-
-        QueryResults results = ksession.getQueryResults("incidents");
-        results.forEach(row -> {
-            IncidentPriority priority = ((IncidentPriority)row.get("incidentPriority"));
-            if (inPriorityZone(priority.getIncident(), priorityZone)) {
-                priority.setNeedsEscalation(true);
-                ksession.update(row.getFactHandle("incidentPriority"), priority);
-            }
-        });
-
         ksession.fireAllRules();
     }
 
@@ -177,91 +159,4 @@ public class RulesVerticle extends AbstractVerticle {
         }
         return Completable.complete();
     }
-
-    /**
-     * Check all known priority zones to determine whether this incident falls within them. If
-     * it falls within one or more zones AND it hasn't yet been escalated, we need to update the escalation flag
-     * and re-run rules.
-     * @param incidentId the id of the incident to check
-     */
-    public void checkPriorityZones(String incidentId) {
-        AtomicInteger withinZones = new AtomicInteger(0);
-        QueryResults priorityZones = ksession.getQueryResults("priorityZones");
-        priorityZones.forEach(row -> {
-            PriorityZone priorityZone = (PriorityZone) row.get("priorityZone");
-            if (inPriorityZone(incidentId, priorityZone)) {
-                withinZones.getAndIncrement();
-            }
-        });
-
-        if (withinZones.get() > 0) {
-            QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
-            QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
-            if ( row != null ) {
-                IncidentPriority incidentPriority = (IncidentPriority) row.get("incidentPriority");
-                if (!incidentPriority.getEscalated()) {
-                    incidentPriority.setNeedsEscalation(true);
-                    ksession.update(row.getFactHandle("incidentPriority"), incidentPriority);
-                    ksession.fireAllRules();
-                }
-            }
-        }
-    }
-
-    /**
-     * Checks whether the specified incident falls within the given priority zone.
-     * 
-     * @param incidentId the incident id
-     * @param priorityZone the priority zone
-     * @return true if the incident falls within the zone
-     */
-    public boolean inPriorityZone(String incidentId, PriorityZone priorityZone) {
-        WebClient client = WebClient.create(this.getVertx());
-        AtomicBoolean inPriorityZone = new AtomicBoolean(false);
-        client.get("http://user4-incident-service.apps.cluster-e222.e222.example.opentlc.com/incidents/incident/3a64e1f5-848c-42af-bc8c-abce650d4e46")
-            .send(ar -> {
-                if (ar.succeeded()) {
-                    JsonObject response = ar.result().bodyAsJsonObject();
-              
-                    double incidentLat = Double.parseDouble(response.getString("lat"));
-                    double incidentLon = Double.parseDouble(response.getString("lon"));
-
-                    inPriorityZone.set(distance(incidentLat, incidentLon, priorityZone.getLat(), priorityZone.getLon(), "K") <= priorityZone.getRadius());
-                  } else {
-                    System.out.println("Something went wrong " + ar.cause().getMessage());
-                  }
-            });
-
-        client.close();
-        return inPriorityZone.get();
-    }
-
-    /**
-     * Calculate the distance between two coordinates in latitude and longitude, using the specified units.
-     * 
-     * @param lat1 the latitude of the first point
-     * @param lon1 the longitude of the first point
-     * @param lat2 the latitude of the second point
-     * @param lon2 the longitude of the second point
-     * @param unit the unit of measurement, where K = kilometers, M = miles (defualt), and N = nautical miles
-     * @return the distance as a double
-     */
-    private static double distance(double lat1, double lon1, double lat2, double lon2, String unit) {
-		if ((lat1 == lat2) && (lon1 == lon2)) {
-			return 0;
-		}
-		else {
-			double theta = lon1 - lon2;
-			double dist = Math.sin(Math.toRadians(lat1)) * Math.sin(Math.toRadians(lat2)) + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.cos(Math.toRadians(theta));
-			dist = Math.acos(dist);
-			dist = Math.toDegrees(dist);
-			dist = dist * 60 * 1.1515;
-			if (unit.equals("K")) {
-				dist = dist * 1.609344;
-			} else if (unit.equals("N")) {
-				dist = dist * 0.8684;
-			}
-			return (dist);
-		}
-	}
 }

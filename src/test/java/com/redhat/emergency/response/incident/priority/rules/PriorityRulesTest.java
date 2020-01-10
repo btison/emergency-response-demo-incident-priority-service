@@ -11,6 +11,9 @@ import java.util.stream.StreamSupport;
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssignmentEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
+
 import org.drools.core.io.impl.ClassPathResource;
 import org.junit.After;
 import org.junit.Before;
@@ -194,6 +197,39 @@ public class PriorityRulesTest {
         assertThat(((AveragePriority)row.get("averagePriority")).getAveragePriority(), equalTo(2.0));
         QueryResults incidents = session.getQueryResults("incidents");
         assertThat(incidents.size(), equalTo(1));
+    }
+
+    @Test
+    public void testPriorityZoneAddedBeforeIncident() {
+        PriorityZone priorityZone = new PriorityZone("pz123", 34.19439, -77.81453, 6);
+        session.insert(new PriorityZoneApplicationEvent(priorityZone));
+        session.fireAllRules();
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false));
+        session.fireAllRules();
+        QueryResults results = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
+        assertThat(results.size(), equalTo(1));
+        QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+        assertThat(row, notNullValue());
+        IncidentPriority priority = (IncidentPriority)row.get("incidentPriority");
+        assertThat(priority.getEscalated(), equalTo(true));
+        assertThat(priority.getPriority(), equalTo(11));
+    }
+
+
+    @Test
+    public void testPriorityZoneAddedAfterIncident() {
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false));
+        session.fireAllRules();
+        PriorityZone priorityZone = new PriorityZone("pz123", 34.19439, -77.81453, 6);
+        session.insert(new PriorityZoneApplicationEvent(priorityZone));
+        session.fireAllRules();
+        QueryResults results = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
+        assertThat(results.size(), equalTo(1));
+        QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+        assertThat(row, notNullValue());
+        IncidentPriority priority = (IncidentPriority)row.get("incidentPriority");
+        assertThat(priority.getEscalated(), equalTo(true));
+        assertThat(priority.getPriority(), equalTo(11));
     }
 
     private static KieBase setupKieBase(String... resources) {
