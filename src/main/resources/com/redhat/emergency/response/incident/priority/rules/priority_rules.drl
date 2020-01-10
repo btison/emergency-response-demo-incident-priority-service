@@ -5,7 +5,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.IncidentRepor
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
-import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 
 global org.slf4j.Logger logger;
 
@@ -53,7 +53,7 @@ when
     $p: IncidentPriority( needsEscalation == true )
     $a: AveragePriority()
 then
-    logger.debug($i + " : " + drools.getRule().getName());
+    logger.debug($p.getIncident() + " : " + drools.getRule().getName());
     modify ( $p ) {
         setNeedsEscalation( false ),
         setEscalated( true ),
