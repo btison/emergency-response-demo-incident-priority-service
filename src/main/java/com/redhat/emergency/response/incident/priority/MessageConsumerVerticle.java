@@ -1,6 +1,8 @@
 package com.redhat.emergency.response.incident.priority;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 import io.reactivex.Completable;
@@ -34,8 +36,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             kafkaConfig.put("enable.auto.commit", "false");
             kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
             kafkaConsumer.handler(this::handleMessage);
-            kafkaConsumer.subscribe(topicIncidentEvent);
-            kafkaConsumer.subscribe(topicPriorityZoneEvent);
+            kafkaConsumer.subscribe(new HashSet<String>(Arrays.asList(topicIncidentEvent, topicPriorityZoneEvent)));
             future.complete();
         }));
     }
