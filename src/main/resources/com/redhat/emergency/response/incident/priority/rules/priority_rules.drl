@@ -92,7 +92,7 @@ then
     modify ( $p ) {
         setNeedsEscalation( false ),
         setEscalated( true ),
-        setPriority( $p.getPriority() + 10 )
+        setPriority( $p.getPriority() + 50 )
     }
     modify ( $a ) {
         setNeedsEvaluation(true)
