@@ -8,6 +8,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssig
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
 
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonObject;
@@ -48,6 +49,7 @@ public class RulesVerticle extends AbstractVerticle {
                 vertx.eventBus().consumer("incident-assignment-event", this::assignmentEvent);
                 vertx.eventBus().consumer("incident-priority", this::incidentPriority);
                 vertx.eventBus().consumer("priority-zone-application-event", this::priorityZone);
+                vertx.eventBus().consumer("priority-zone-clear-event", this::clearPriorityZones);
                 vertx.eventBus().consumer("reset", this::reset);
 
                 future.complete();
@@ -125,6 +127,11 @@ public class RulesVerticle extends AbstractVerticle {
         ksession.fireAllRules();
     }
 
+    private void clearPriorityZones(Message<JsonObject> message) {
+        log.debug("PriorityZoneClearEvent - received message {}", message.body());
+        ksession.insert(new PriorityZoneClearEvent());
+        ksession.fireAllRules();
+    }
 
     private KieBase setupKieBase(String... resources) {
         KieServices ks = KieServices.Factory.get();

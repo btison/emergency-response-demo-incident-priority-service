@@ -7,7 +7,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.AveragePriori
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 import com.redhat.emergency.response.incident.priority.rules.model.ProximityEvaluator;
-
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
 
 global org.slf4j.Logger logger;
 
@@ -97,6 +97,16 @@ then
     modify ( $a ) {
         setNeedsEvaluation(true)
     }
+end
+
+rule "Clear all priority zones"
+when
+    $c: PriorityZoneClearEvent()
+    $z: PriorityZone()
+then
+    logger.debug(drools.getRule().getName());
+    retract ( $z );
+    retract ( $c );
 end
 
 rule "Increase priority by one when incident cannot be assigned"

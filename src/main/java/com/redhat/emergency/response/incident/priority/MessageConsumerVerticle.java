@@ -99,22 +99,25 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                 return;
             }
             String messageType = message.getString("messageType");
-            if (!("PriorityZoneApplicationEvent".equals(messageType))) {
-                log.debug("Unexpected message type '{}' in message {}. Ignoring message", messageType, message);
-                return;
-            }
-            JsonObject body = message.getJsonObject("body");
-            if (body == null
-                    || body.getString("id") == null
-                    || body.getString("lat") == null
-                    || body.getString("lon") == null
-                    || body.getString("radius") == null) {
-                log.warn("Message of type '{}' has unexpected structure: {}", messageType, message);
-            }
-            log.debug("Consumed '{}' message for priorityZone '{}'. Topic: {}} ,  partition: {}}, offset: {}", 
-                messageType, body.getString("id"), msg.topic(), msg.partition(), msg.offset());
+            
+            if ("PriorityZoneApplicationEvent".equals(messageType)) {
+                JsonObject body = message.getJsonObject("body");
+                if (body == null
+                        || body.getString("id") == null
+                        || body.getString("lat") == null
+                        || body.getString("lon") == null
+                        || body.getString("radius") == null) {
+                    log.warn("Message of type '{}' has unexpected structure: {}", messageType, message);
+                }
+                log.debug("Consumed '{}' message for priorityZone '{}'. Topic: {}} ,  partition: {}}, offset: {}", 
+                    messageType, body.getString("id"), msg.topic(), msg.partition(), msg.offset());
 
-            vertx.eventBus().send("priority-zone-application-event", body);
+                vertx.eventBus().send("priority-zone-application-event", body);
+            } else if ("PriorityZoneClearEvent".equals(messageType)) {
+                vertx.eventBus().send("priority-zone-clear-event", "");
+            } else {
+                log.debug("Unexpected message type '{}' in message {}. Ignoring message", messageType, message);
+            }
 
         } finally {
             //commit message
