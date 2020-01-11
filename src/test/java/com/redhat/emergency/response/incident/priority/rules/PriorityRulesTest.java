@@ -213,7 +213,7 @@ public class PriorityRulesTest {
         assertThat(row, notNullValue());
         IncidentPriority priority = (IncidentPriority)row.get("incidentPriority");
         assertThat(priority.getEscalated(), equalTo(true));
-        assertThat(priority.getPriority(), equalTo(11));
+        assertThat(priority.getPriority(), equalTo(51));
     }
 
 
@@ -230,7 +230,7 @@ public class PriorityRulesTest {
         assertThat(row, notNullValue());
         IncidentPriority priority = (IncidentPriority)row.get("incidentPriority");
         assertThat(priority.getEscalated(), equalTo(true));
-        assertThat(priority.getPriority(), equalTo(11));
+        assertThat(priority.getPriority(), equalTo(51));
     }
 
     private static KieBase setupKieBase(String... resources) {
