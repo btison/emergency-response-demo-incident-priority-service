@@ -14,6 +14,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssig
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
 
 import org.drools.core.io.impl.ClassPathResource;
 import org.junit.After;
@@ -205,6 +206,9 @@ public class PriorityRulesTest {
         PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone));
         session.fireAllRules();
+        PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal(0), new BigDecimal(0), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZone2));
+        session.fireAllRules();
         session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false,  new BigDecimal(34.19439), new BigDecimal(-77.81453)));
         session.fireAllRules();
         QueryResults results = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
@@ -219,7 +223,11 @@ public class PriorityRulesTest {
 
     @Test
     public void testPriorityZoneAddedAfterIncident() {
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e44", false, new BigDecimal(0), new BigDecimal(-77.81453)));
+        session.fireAllRules();
         session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal(34.19439), new BigDecimal(-77.81453)));
+        session.fireAllRules();
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e45", false, new BigDecimal(0), new BigDecimal(-77.81453)));
         session.fireAllRules();
         PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
         session.insert(new PriorityZoneApplicationEvent(priorityZone));
@@ -231,6 +239,20 @@ public class PriorityRulesTest {
         IncidentPriority priority = (IncidentPriority)row.get("incidentPriority");
         assertThat(priority.getEscalated(), equalTo(true));
         assertThat(priority.getPriority(), equalTo(51));
+    }
+
+    @Test
+    public void testPriorityZoneClearEvent() {
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZone));
+        session.fireAllRules();
+        PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZone2));
+        session.fireAllRules();
+        session.insert(new PriorityZoneClearEvent());
+        session.fireAllRules();
+        QueryResults results = session.getQueryResults("priorityZones");
+        assertThat(results.size(), equalTo(0));
     }
 
     private static KieBase setupKieBase(String... resources) {

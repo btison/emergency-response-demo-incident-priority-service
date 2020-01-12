@@ -8,8 +8,6 @@ public class IncidentPriority {
 
     private Integer priority;
 
-    private boolean needsEscalation;
-
     private boolean escalated;
 
     private BigDecimal lat;
@@ -20,7 +18,6 @@ public class IncidentPriority {
         this.incident = incident;
         this.priority = 0;
         this.escalated = false;
-        this.needsEscalation = false;
         this.lat = lat;
         this.lon = lon;
     }
@@ -39,15 +36,6 @@ public class IncidentPriority {
 
     public void setPriority(Integer priority) {
         this.priority = priority;
-    }
-
-
-    public boolean getNeedsEscalation() {
-        return needsEscalation;
-    }
-
-    public void setNeedsEscalation(boolean needsEscalation) {
-        this.needsEscalation = needsEscalation;
     }
 
     public boolean getEscalated() {

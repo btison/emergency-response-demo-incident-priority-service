@@ -8,6 +8,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneA
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 import com.redhat.emergency.response.incident.priority.rules.model.ProximityEvaluator;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
+import java.util.List;
 
 global org.slf4j.Logger logger;
 
@@ -56,56 +57,51 @@ then
     insert( $e.getPriorityZone() );
 end
 
-rule "Flag incidents which fall within an updated priority zone"
+rule "Escalate the priority of incidents which fall within an updated priority zone"
 when
     $e: PriorityZoneApplicationEvent()
-    $z: PriorityZone()
-    $p: IncidentPriority( escalated == false )
+    $z: PriorityZone( id == $e.getPriorityZone().getId() )
     $x: ProximityEvaluator()
+    $ps : List() from collect(IncidentPriority( escalated == false, $x.inPriorityZone(this, $z) ))
 then
-    logger.debug($z.getId() + " : " + $p.getIncident() + " : " + drools.getRule().getName());
-    modify ( $p ) {
-        setNeedsEscalation($x.inPriorityZone($p, $z))
+    for (Object $o : $ps) {
+        logger.debug($z.getId() + " : " + ((IncidentPriority)$o) + " : " + drools.getRule().getName());
+        IncidentPriority $p = (IncidentPriority) $o;
+        modify ($p) {
+            setEscalated( true ),
+            setPriority( $p.getPriority() + 50 )
+        }
     }
+    
     retract( $e );
 end
 
-rule "Flag updated incident if it falls within a priority zone"
+rule "Escalate the priority of an updated incident if it falls within at least one priority zone"
 when 
     $e: IncidentAssignmentEvent( $i: incident, assigned == false )
     $p: IncidentPriority( incident == $i, escalated == false )
-    $z: PriorityZone()
     $x: ProximityEvaluator()
-then
-    logger.debug($z.getId() + " : " + $p.getIncident() + " : " + drools.getRule().getName());
-    modify ( $p ) {
-        setNeedsEscalation($x.inPriorityZone($p, $z))
-    }
-end
-
-rule "Escalate the priority of flagged incidents"
-when
-    $p: IncidentPriority( needsEscalation == true )
-    $a: AveragePriority()
+    List( size > 0) 
+        from collect (PriorityZone( $x.inPriorityZone($p, this) ))
 then
     logger.debug($p.getIncident() + " : " + drools.getRule().getName());
     modify ( $p ) {
-        setNeedsEscalation( false ),
         setEscalated( true ),
         setPriority( $p.getPriority() + 50 )
-    }
-    modify ( $a ) {
-        setNeedsEvaluation(true)
     }
 end
 
 rule "Clear all priority zones"
 when
     $c: PriorityZoneClearEvent()
-    $z: PriorityZone()
+    $zs: List() from collect(PriorityZone())
 then
     logger.debug(drools.getRule().getName());
-    retract ( $z );
+
+    for (Object $o : $zs) {
+        PriorityZone $z = (PriorityZone) $o;
+        retract ( $z );
+    }
     retract ( $c );
 end
 
