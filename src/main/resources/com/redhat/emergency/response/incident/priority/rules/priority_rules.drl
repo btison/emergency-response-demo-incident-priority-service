@@ -105,12 +105,20 @@ rule "Clear all priority zones"
 when
     $c: PriorityZoneClearEvent()
     $zs: List() from collect(PriorityZone())
+    $ps: List() from collect(IncidentPriority(escalated == true))
 then
     logger.debug(drools.getRule().getName());
 
     for (Object $o : $zs) {
         PriorityZone $z = (PriorityZone) $o;
         retract ( $z );
+    }
+    for (Object $o : $ps) {
+        IncidentPriority $p = (IncidentPriority) $o;
+        modify ($p) {
+            setEscalated( false ),
+            setPriority( $p.getPriority() - priorityZoneUpsurge.intValue() )
+        }
     }
     retract ( $c );
 end
