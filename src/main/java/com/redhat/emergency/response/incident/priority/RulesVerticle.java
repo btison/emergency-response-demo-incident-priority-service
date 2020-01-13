@@ -38,6 +38,8 @@ public class RulesVerticle extends AbstractVerticle {
 
     private KieSession ksession;
 
+    private final Integer priorityZoneUpsurge = 50;
+
     @Override
     public Completable rxStart() {
         
@@ -66,6 +68,7 @@ public class RulesVerticle extends AbstractVerticle {
         ksession = kbase.newKieSession();
         Logger logger = LoggerFactory.getLogger("PriorityRules");
         ksession.setGlobal("logger", logger);
+        ksession.setGlobal("priorityZoneUpsurge", priorityZoneUpsurge);
     }
 
     private void reset(Message<JsonObject> message) {

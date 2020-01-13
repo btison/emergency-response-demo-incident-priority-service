@@ -52,7 +52,9 @@ public class PriorityRulesTest {
     public void setupTest() {
         session = kieBase.newKieSession();
         Logger logger = LoggerFactory.getLogger("PriorityRules");
+        Integer priorityZoneUpsurge = Integer.valueOf(50);
         session.setGlobal("logger", logger);
+        session.setGlobal("priorityZoneUpsurge", priorityZoneUpsurge);
     }
 
     @After
@@ -253,6 +255,68 @@ public class PriorityRulesTest {
         session.fireAllRules();
         QueryResults results = session.getQueryResults("priorityZones");
         assertThat(results.size(), equalTo(0));
+    }
+
+    @Test
+    public void testPriorityZoneDeEscalation() {
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZone));
+        session.fireAllRules();
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal(34.19439), new BigDecimal(-77.81453)));
+        session.fireAllRules();
+
+        //make sure incident gets escalated
+        QueryResults results = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
+        QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+        IncidentPriority priority = (IncidentPriority)row.get("incidentPriority");
+        assertThat(priority.getEscalated(), equalTo(true));
+        assertThat(priority.getPriority(), equalTo(51));
+
+        //change the location of the priority zone
+        PriorityZone priorityZoneUpdate = new PriorityZone("pz123", new BigDecimal(0), new BigDecimal(0), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZoneUpdate));
+        session.fireAllRules();
+
+        //make sure incident gets de-escalated
+        QueryResults resultsUpdate = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
+        QueryResultsRow rowUpdate = StreamSupport.stream(resultsUpdate.spliterator(), false).findFirst().orElse(null);
+        IncidentPriority priorityUpdate = (IncidentPriority)rowUpdate.get("incidentPriority");
+        assertThat(priorityUpdate.getEscalated(), equalTo(false));
+        assertThat(priorityUpdate.getPriority(), equalTo(1));
+    }
+
+    @Test
+    public void testSkipDeEscalationWhenInMultiplePriorityZones() {
+        //Add two priority zones in the same spot
+        PriorityZone priorityZone = new PriorityZone("pz123", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZone));
+        session.fireAllRules();
+        PriorityZone priorityZone2 = new PriorityZone("pz1234", new BigDecimal(34.19439), new BigDecimal(-77.81453), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZone2));
+        session.fireAllRules();
+
+        //Add an incident that falls in both
+        session.insert(new IncidentAssignmentEvent("3a64e1f5-848c-42af-bc8c-abce650d4e46", false, new BigDecimal(34.19439), new BigDecimal(-77.81453)));
+        session.fireAllRules();
+
+        //make sure incident gets escalated
+        QueryResults results = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
+        QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+        IncidentPriority priority = (IncidentPriority)row.get("incidentPriority");
+        assertThat(priority.getEscalated(), equalTo(true));
+        assertThat(priority.getPriority(), equalTo(51));
+
+        //change the location of one of the priority zones
+        PriorityZone priorityZoneUpdate = new PriorityZone("pz123", new BigDecimal(0), new BigDecimal(0), new BigDecimal(6));
+        session.insert(new PriorityZoneApplicationEvent(priorityZoneUpdate));
+        session.fireAllRules();
+
+        //make sure incident is still escalated
+        QueryResults results2 = session.getQueryResults("incidentPriority", "3a64e1f5-848c-42af-bc8c-abce650d4e46");
+        QueryResultsRow row2 = StreamSupport.stream(results2.spliterator(), false).findFirst().orElse(null);
+        IncidentPriority priority2 = (IncidentPriority)row2.get("incidentPriority");
+        assertThat(priority2.getEscalated(), equalTo(true));
+        assertThat(priority2.getPriority(), equalTo(51));
     }
 
     private static KieBase setupKieBase(String... resources) {
