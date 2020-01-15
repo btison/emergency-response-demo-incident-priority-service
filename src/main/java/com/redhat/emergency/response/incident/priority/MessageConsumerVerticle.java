@@ -19,10 +19,6 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private KafkaConsumer<String, String> kafkaConsumer;
 
-    private final String topicIncidentEvent = "topic-incident-event";
-
-    private final String topicPriorityZoneEvent = "topic-priority-zone-event";
-
     @Override
     public Completable rxStart() {
 
@@ -36,25 +32,22 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             kafkaConfig.put("enable.auto.commit", "false");
             kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
             kafkaConsumer.handler(this::handleMessage);
-            kafkaConsumer.subscribe(new HashSet<String>(Arrays.asList(topicIncidentEvent, topicPriorityZoneEvent)));
+            kafkaConsumer.subscribe(new HashSet<String>(Arrays.asList(
+                config().getString("topic-incident-assignment-event"), 
+                config().getString("topic-priority-zone-application-event"))
+            ));
             future.complete();
         }));
     }
 
     private void handleMessage(KafkaConsumerRecord<String, String> msg) {
-        switch(msg.topic()){
-            case topicIncidentEvent:
-                handleIncidentEventMessage(msg);
-                break;
-            case topicPriorityZoneEvent:
-                handlePriorityZoneEventMessage(msg);
-                break;
-            default:
-                log.debug("Unsupported message topic: {}", msg.topic());
-        }
-        if (msg.topic().equals(topicIncidentEvent)) {
+        if (msg.topic().equals(config().getString("topic-incident-assignment-event"))) {
             handleIncidentEventMessage(msg);
-        } 
+        } else if (msg.topic().equals(config().getString("topic-priority-zone-application-event"))) {
+            handlePriorityZoneEventMessage(msg);
+        } else {
+            log.debug("Unsupported message topic: {}", msg.topic());
+        }
     }
 
     private void handleIncidentEventMessage(KafkaConsumerRecord<String, String> msg) {
