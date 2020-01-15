@@ -11,6 +11,7 @@ import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneA
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
 
 import io.reactivex.Completable;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.eventbus.Message;
@@ -50,6 +51,7 @@ public class RulesVerticle extends AbstractVerticle {
 
                 vertx.eventBus().consumer("incident-assignment-event", this::assignmentEvent);
                 vertx.eventBus().consumer("incident-priority", this::incidentPriority);
+                vertx.eventBus().consumer("priority-zones", this::priorityZones);
                 vertx.eventBus().consumer("priority-zone-application-event", this::priorityZone);
                 vertx.eventBus().consumer("priority-zone-clear-event", this::clearPriorityZones);
                 vertx.eventBus().consumer("reset", this::reset);
@@ -111,6 +113,26 @@ public class RulesVerticle extends AbstractVerticle {
         JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
                 .put("average", average).put("incidents", results.size());
         message.reply(jsonObject);
+    }
+
+    /**
+     * Retrieve all priority zones from the kie session
+     * @param message a JsonArray containing the priority zones
+     */
+    private void priorityZones(Message<JsonObject> message) {
+        log.debug("PriorityZones - received message: " + message.body().toString());
+        QueryResults results = ksession.getQueryResults("priorityZones");
+        JsonArray zones = new JsonArray();
+        results.forEach(result -> {
+            PriorityZone priorityZone = (PriorityZone) result.get("priorityZone");
+            zones.add(new JsonObject()
+                .put("id", priorityZone.getId())
+                .put("lat", priorityZone.getLat().toString())
+                .put("lon", priorityZone.getLon().toString())
+                .put("radius", priorityZone.getRadius().toString()));
+        });
+
+        message.reply(zones);
     }
 
     /**
