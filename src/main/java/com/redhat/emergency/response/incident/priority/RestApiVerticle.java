@@ -25,7 +25,7 @@ public class RestApiVerticle extends AbstractVerticle {
         HealthCheckHandler healthCheckHandler = HealthCheckHandler.create(vertx)
                 .register("health", f -> f.complete(Status.OK()));
         router.get("/health").handler(healthCheckHandler);
-        router.post("/priority/:incidentId").handler(this::priority);
+        router.get("/priority/:incidentId").handler(this::priority);
         router.post("/reset").handler(this::reset);
         router.get("/priority-zones").handler(this::priorityZones);
 
@@ -37,7 +37,7 @@ public class RestApiVerticle extends AbstractVerticle {
 
     private void priority(RoutingContext rc) {
         String incidentId = rc.request().getParam("incidentId");
-        vertx.eventBus().rxRequest("incident-priority", rc.getBodyAsJson().put("incidentId", incidentId))
+        vertx.eventBus().rxRequest("incident-priority", new JsonObject().put("incidentId", incidentId))
                 .subscribe((json) -> rc.response().setStatusCode(200)
                                 .putHeader("content-type", "application/json")
                                 .end(json.body().toString()),
