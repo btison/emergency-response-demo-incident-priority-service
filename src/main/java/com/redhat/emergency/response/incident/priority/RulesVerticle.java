@@ -93,9 +93,21 @@ public class RulesVerticle extends AbstractVerticle {
         String incidentId = message.body().getString("incidentId");
         QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
         QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
-        Integer priority;
+        Integer priority = 0;
         if (row == null) {
-            priority =0;
+            if (message.body().getBoolean("active")) {
+                BigDecimal lat = new BigDecimal(message.body().getString("lat"));
+                BigDecimal lon = new BigDecimal(message.body().getString("lon"));
+
+                ksession.insert(new IncidentAssignmentEvent(incidentId, false, lat, lon));
+                ksession.fireAllRules();
+
+                QueryResults updatedResults = ksession.getQueryResults("incidentPriority", incidentId);
+                QueryResultsRow updatedRow = StreamSupport.stream(updatedResults.spliterator(), false).findFirst().orElse(null);
+                if (updatedRow != null) {
+                    priority = ((IncidentPriority) updatedRow.get("incidentPriority")).getPriority();
+                }
+            }
         } else {
             priority = ((IncidentPriority)row.get("incidentPriority")).getPriority();
         }
