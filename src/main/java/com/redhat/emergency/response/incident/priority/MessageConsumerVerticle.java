@@ -59,23 +59,36 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                 return;
             }
             String messageType = message.getString("messageType");
-            if (!("IncidentAssignmentEvent".equals(messageType))) {
-                log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
-                return;
-            }
-            JsonObject body = message.getJsonObject("body");
-            if (body == null
-                    || body.getString("incidentId") == null
-                    || body.getBoolean("assignment") == null
-                    || body.getString("lat") == null
-                    || body.getString("lon") == null) {
-                log.warn("Message of type '" + "' has unexpected structure: " + message.toString());
-            }
-            String incidentId = message.getJsonObject("body").getString("incidentId");
-            log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'. Topic: " + msg.topic()
-                    + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
+            if ("IncidentAssignmentEvent".equals(messageType)) {
+                JsonObject body = message.getJsonObject("body");
+                if (body == null
+                        || body.getString("incidentId") == null
+                        || body.getBoolean("assignment") == null
+                        || body.getString("lat") == null
+                        || body.getString("lon") == null) {
+                    log.warn("Message of type '" + "' has unexpected structure: " + message.toString());
+                }
+                String incidentId = message.getJsonObject("body").getString("incidentId");
+                log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'. Topic: " + msg.topic()
+                        + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
 
-            vertx.eventBus().send("incident-assignment-event", body);
+                vertx.eventBus().send("incident-assignment-event", body);
+            } else if ("IncidentReportedEvent".equals(messageType)) {
+                JsonObject body = message.getJsonObject("body");
+                JsonObject payload = new JsonObject()
+                    .put("incidentId", body.getString("id"))
+                    .put("assigment", false)
+                    .put("lat", body.getFloat("lat").toString())
+                    .put("lon", body.getFloat("lon").toString());
+                
+                String incidentId = payload.getString("incidentId");
+                log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'. Topic: " + msg.topic()
+                        + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
+
+                vertx.eventBus().send("incident-assignment-event", payload);
+            } else {
+                log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
+            }
 
         } finally {
             //commit message
