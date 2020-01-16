@@ -86,6 +86,8 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                         + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
 
                 vertx.eventBus().send("incident-assignment-event", payload);
+            } else if ("PriorityZoneClearEvent".equals(messageType)) {
+                vertx.eventBus().send("priority-zone-clear-event", "");
             } else {
                 log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
             }
