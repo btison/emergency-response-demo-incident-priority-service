@@ -94,10 +94,13 @@ public class RulesVerticle extends AbstractVerticle {
         QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
         QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
         Integer priority;
+        boolean escalated;
         if (row == null) {
-            priority =0;
+            priority = 0;
+            escalated = false;
         } else {
             priority = ((IncidentPriority)row.get("incidentPriority")).getPriority();
+            escalated = ((IncidentPriority)row.get("incidentPriority")).getEscalated();
         }
 
         results = ksession.getQueryResults("averagePriority");
@@ -111,7 +114,7 @@ public class RulesVerticle extends AbstractVerticle {
 
         results = ksession.getQueryResults("incidents");
         JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
-                .put("average", average).put("incidents", results.size());
+                .put("average", average).put("incidents", results.size()).put("escalated", escalated);
         message.reply(jsonObject);
     }
 
