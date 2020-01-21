@@ -113,8 +113,11 @@ public class RulesVerticle extends AbstractVerticle {
         }
 
         results = ksession.getQueryResults("incidents");
+        Integer escalatedIncidents = Math.toIntExact(StreamSupport.stream(results.spliterator(), false).filter(incident -> {
+            return ((IncidentPriority)incident.get("incidentPriority")).getEscalated();
+        }).count());
         JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
-                .put("average", average).put("incidents", results.size()).put("escalated", escalated);
+                .put("average", average).put("incidents", results.size()).put("escalated", escalated).put("escalatedIncidents", escalatedIncidents);
         message.reply(jsonObject);
     }
 
