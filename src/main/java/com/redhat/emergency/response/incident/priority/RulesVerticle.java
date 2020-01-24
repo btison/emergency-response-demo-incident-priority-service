@@ -1,11 +1,17 @@
 package com.redhat.emergency.response.incident.priority;
 
+import java.math.BigDecimal;
 import java.util.stream.StreamSupport;
 
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssignmentEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
+
 import io.reactivex.Completable;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.eventbus.Message;
@@ -33,6 +39,8 @@ public class RulesVerticle extends AbstractVerticle {
 
     private KieSession ksession;
 
+    private final Integer priorityZoneUpsurge = 50;
+
     @Override
     public Completable rxStart() {
         
@@ -43,6 +51,9 @@ public class RulesVerticle extends AbstractVerticle {
 
                 vertx.eventBus().consumer("incident-assignment-event", this::assignmentEvent);
                 vertx.eventBus().consumer("incident-priority", this::incidentPriority);
+                vertx.eventBus().consumer("priority-zones", this::priorityZones);
+                vertx.eventBus().consumer("priority-zone-application-event", this::priorityZone);
+                vertx.eventBus().consumer("priority-zone-clear-event", this::clearPriorityZones);
                 vertx.eventBus().consumer("reset", this::reset);
 
                 future.complete();
@@ -59,6 +70,7 @@ public class RulesVerticle extends AbstractVerticle {
         ksession = kbase.newKieSession();
         Logger logger = LoggerFactory.getLogger("PriorityRules");
         ksession.setGlobal("logger", logger);
+        ksession.setGlobal("priorityZoneUpsurge", priorityZoneUpsurge);
     }
 
     private void reset(Message<JsonObject> message) {
@@ -69,8 +81,9 @@ public class RulesVerticle extends AbstractVerticle {
 
     private void assignmentEvent(Message<JsonObject> message) {
         log.debug("AssignmentEvent - received message: " + message.body().toString());
+
         IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
-                message.body().getBoolean("assignment"));
+                message.body().getBoolean("assignment"), new BigDecimal(message.body().getString("lat")), new BigDecimal(message.body().getString("lon")));
         ksession.insert(incidentAssignmentEvent);
         ksession.fireAllRules();
     }
@@ -81,10 +94,13 @@ public class RulesVerticle extends AbstractVerticle {
         QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
         QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
         Integer priority;
+        boolean escalated;
         if (row == null) {
-            priority =0;
+            priority = 0;
+            escalated = false;
         } else {
             priority = ((IncidentPriority)row.get("incidentPriority")).getPriority();
+            escalated = ((IncidentPriority)row.get("incidentPriority")).getEscalated();
         }
 
         results = ksession.getQueryResults("averagePriority");
@@ -97,11 +113,56 @@ public class RulesVerticle extends AbstractVerticle {
         }
 
         results = ksession.getQueryResults("incidents");
+        Integer escalatedIncidents = Math.toIntExact(StreamSupport.stream(results.spliterator(), false).filter(incident -> {
+            return ((IncidentPriority)incident.get("incidentPriority")).getEscalated();
+        }).count());
         JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
-                .put("average", average).put("incidents", results.size());
+                .put("average", average).put("incidents", results.size()).put("escalated", escalated).put("escalatedIncidents", escalatedIncidents);
         message.reply(jsonObject);
     }
 
+    /**
+     * Retrieve all priority zones from the kie session
+     * @param message a JsonArray containing the priority zones
+     */
+    private void priorityZones(Message<JsonObject> message) {
+        log.debug("PriorityZones - received message: " + message.body().toString());
+        QueryResults results = ksession.getQueryResults("priorityZones");
+        JsonArray zones = new JsonArray();
+        results.forEach(result -> {
+            PriorityZone priorityZone = (PriorityZone) result.get("priorityZone");
+            zones.add(new JsonObject()
+                .put("id", priorityZone.getId())
+                .put("lat", priorityZone.getLat().toString())
+                .put("lon", priorityZone.getLon().toString())
+                .put("radius", priorityZone.getRadius().toString()));
+        });
+
+        message.reply(zones);
+    }
+
+    /**
+     * Add or update a priority zone
+     * @param message the PriorityZoneApplicationEvent from kafka
+     */
+    private void priorityZone(Message<JsonObject> message) {
+        log.debug("PriorityZoneApplicationEvent - received message {}", message.body());
+        String id = message.body().getString("id");
+        BigDecimal lat = new BigDecimal(message.body().getString("lat"));
+        BigDecimal lon = new BigDecimal(message.body().getString("lon"));
+        BigDecimal radius = new BigDecimal(message.body().getString("radius"));
+
+        PriorityZone priorityZone = new PriorityZone(id, lat, lon, radius);
+        PriorityZoneApplicationEvent event = new PriorityZoneApplicationEvent(priorityZone);
+        ksession.insert(event);
+        ksession.fireAllRules();
+    }
+
+    private void clearPriorityZones(Message<JsonObject> message) {
+        log.debug("PriorityZoneClearEvent - received message {}", message.body());
+        ksession.insert(new PriorityZoneClearEvent());
+        ksession.fireAllRules();
+    }
 
     private KieBase setupKieBase(String... resources) {
         KieServices ks = KieServices.Factory.get();

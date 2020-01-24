@@ -4,8 +4,13 @@ import com.redhat.emergency.response.incident.priority.rules.model.IncidentAssig
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentReportedEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.IncidentPriority;
 import com.redhat.emergency.response.incident.priority.rules.model.AveragePriority;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
+import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
+import java.util.List;
 
 global org.slf4j.Logger logger;
+global java.lang.Integer priorityZoneUpsurge;
 
 rule "Create AveragePriority fact"
 when
@@ -20,7 +25,109 @@ when
     not ( IncidentPriority( incident == $i ) )
 then
     logger.debug($i + " : " + drools.getRule().getName());
-    insert( new IncidentPriority($i) );
+    insert( new IncidentPriority($i, $e.getLat(), $e.getLon()) );
+end
+
+rule "Update priority zone fact for an adjusted zone"
+when
+    $e: PriorityZoneApplicationEvent()
+    $z: PriorityZone( id == $e.getPriorityZone().getId() )
+then
+    logger.debug($e.getPriorityZone().getId() + " : " + drools.getRule().getName());
+    modify ( $z ) {
+        setLat( $e.getPriorityZone().getLat() ),
+        setLon( $e.getPriorityZone().getLon() ),
+        setRadius( $e.getPriorityZone().getRadius() )
+    }
+end
+
+rule "Create priority zone fact for a newly placed zone"
+when
+    $e: PriorityZoneApplicationEvent()
+    not ( PriorityZone( id == $e.getPriorityZone().getId() ) )
+then 
+    logger.debug($e.getPriorityZone().getId() + " : " + drools.getRule().getName());
+    insert( $e.getPriorityZone() );
+end
+
+rule "Escalate the priority of incidents which fall within an updated priority zone"
+when
+    $e: PriorityZoneApplicationEvent()
+    $z: PriorityZone( id == $e.getPriorityZone().getId() )
+    $ps : List() from collect(IncidentPriority( escalated == false, $z.containsIncident(this) ))
+then
+    for (Object $o : $ps) {
+        logger.debug($z.getId() + " : " + ((IncidentPriority)$o) + " : " + drools.getRule().getName());
+        IncidentPriority $p = (IncidentPriority) $o;
+        modify ($p) {
+            setEscalated( true ),
+            setPriority( $p.getPriority() + priorityZoneUpsurge.intValue() )
+        }
+    }
+end
+
+rule "De-escalate the priority of incidents which no longer fall within an updated priority zone, or any other"
+when
+    $e: PriorityZoneApplicationEvent()
+    $zs: List() from collect (PriorityZone())
+    $ps: List() from collect(IncidentPriority( escalated == true, $e.getPriorityZone().containsIncident(this) == false ))
+then
+    
+    for (Object $o : $ps) {
+        IncidentPriority $p = (IncidentPriority) $o;
+        
+        //only de-escalate if the incident does not fall in any other priority zone
+        if (! $zs.stream().filter($z -> ((PriorityZone)$z).containsIncident($p)).findFirst().isPresent()) {
+            logger.debug($p.getIncident() + " : " + ((IncidentPriority)$o) + " : " + drools.getRule().getName());
+
+            modify ($p) {
+                setEscalated( false ),
+                setPriority( $p.getPriority() - priorityZoneUpsurge.intValue() )
+            }
+        }
+    }
+end
+
+rule "Escalate the priority of an updated incident if it falls within at least one priority zone"
+when 
+    $e: IncidentAssignmentEvent( $i: incident, assigned == false )
+    $p: IncidentPriority( incident == $i, escalated == false )
+    List( size > 0 ) from collect (PriorityZone( containsIncident($p) ))
+then
+    logger.debug($p.getIncident() + " : " + drools.getRule().getName());
+    modify ( $p ) {
+        setEscalated( true ),
+        setPriority( $p.getPriority() + priorityZoneUpsurge.intValue() )
+    }
+end
+
+rule "Clear all priority zones"
+when
+    $c: PriorityZoneClearEvent()
+    $zs: List() from collect(PriorityZone())
+    $ps: List() from collect(IncidentPriority(escalated == true))
+then
+    logger.debug(drools.getRule().getName());
+
+    for (Object $o : $zs) {
+        PriorityZone $z = (PriorityZone) $o;
+        retract ( $z );
+    }
+    for (Object $o : $ps) {
+        IncidentPriority $p = (IncidentPriority) $o;
+        modify ($p) {
+            setEscalated( false ),
+            setPriority( $p.getPriority() - priorityZoneUpsurge.intValue() )
+        }
+    }
+    retract ( $c );
+end
+
+rule "Remove PriorityZoneApplicationEvent after rule execution"
+when
+    $e: PriorityZoneApplicationEvent()
+then
+    retract ($e);
 end
 
 rule "Increase priority by one when incident cannot be assigned"
@@ -84,10 +191,18 @@ query "incidentPriority" (String i)
    incidentPriority : IncidentPriority( incident == i )
 end
 
+query "priorityZone" (String i)
+   priorityZone: PriorityZone( id == i )
+end
+
 query "averagePriority"
    averagePriority : AveragePriority( )
 end
 
 query "incidents"
    incidentPriority: IncidentPriority()
+end
+
+query "priorityZones"
+    priorityZone: PriorityZone()
 end
