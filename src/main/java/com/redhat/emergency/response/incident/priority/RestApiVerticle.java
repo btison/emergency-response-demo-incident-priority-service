@@ -114,7 +114,6 @@ public class RestApiVerticle extends AbstractVerticle {
     private void applyPriorityZone(RoutingContext rc) {
         String id = rc.request().getParam("id");
 
-        log.info(rc.getBodyAsString());
         JsonObject body = rc.getBodyAsJson();
         if (body == null
                 || body.getString("lat") == null
@@ -124,6 +123,8 @@ public class RestApiVerticle extends AbstractVerticle {
         }
 
         body.put("id", id);
+
+        log.debug("Received priority zone application request: {}", body.encodePrettily());
 
         vertx.eventBus().send("priority-zone-application-event", body);
         rc.response().setStatusCode(200).end();
