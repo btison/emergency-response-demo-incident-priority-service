@@ -30,8 +30,7 @@ public class MainVerticle extends AbstractVerticle {
                 .setType("configmap")
                 .setFormat("yaml")
                 .setConfig(new JsonObject()
-                        .put("name", System.getProperty("sso.configmap", "sso-config"))
-                        .put("key", System.getProperty("sso.configmap.key", "sso-config.yaml")));
+                        .put("name", System.getProperty("sso.configmap", "sso-config")));
         ConfigRetrieverOptions options = new ConfigRetrieverOptions();
         if (System.getenv("KUBERNETES_NAMESPACE") != null) {
             //we're running in Kubernetes
@@ -45,7 +44,7 @@ public class MainVerticle extends AbstractVerticle {
         ConfigRetriever retriever = ConfigRetriever.create(vertx, options);
         return retriever.rxGetConfig()
                 .flatMapCompletable(json -> {
-                    JsonObject rest = new JsonObject().put("http", json.getJsonObject("http")).put("sso", json.getJsonObject("sso"));
+                    JsonObject rest = json; //sso-config is created without an overarching key
                     JsonObject kafka = json.getJsonObject("kafka");
                     return vertx.rxDeployVerticle(MessageConsumerVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement()
                             .andThen(vertx.rxDeployVerticle(RulesVerticle::new, new DeploymentOptions()).ignoreElement())
