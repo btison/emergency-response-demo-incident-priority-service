@@ -36,11 +36,11 @@ public class RestApiVerticle extends AbstractVerticle {
 
         //configure KeyCloak
         JsonObject keycloakJson = new JsonObject()
-            .put("realm", config.getString("realm"))
-            .put("auth-server-url", config.getString("auth-server-url"))
+            .put("realm", config.getJsonObject("sso").getString("REALM"))
+            .put("auth-server-url", config.getJsonObject("sso").getString("AUTH_URL"))
             .put("ssl-required", "external")
-            .put("resource", config.getString("client-name"))
-            .put("credentials", new JsonObject().put("secret", config.getString("client-secret")))
+            .put("resource", config.getJsonObject("sso").getString("VERTX_CLIENTID"))
+            .put("credentials", new JsonObject().put("secret", config.getJsonObject("sso").getString("VERTX_CLIENT_SECRET")))
             .put("confidential-port", 0);
         OAuth2Auth oauth2 = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, keycloakJson);
         OAuth2AuthHandler oauth2Handler = OAuth2AuthHandler.create(oauth2);
@@ -62,7 +62,7 @@ public class RestApiVerticle extends AbstractVerticle {
 
         return vertx.createHttpServer()
                 .requestHandler(router)
-                .rxListen(config.getInteger("port", 8080))
+                .rxListen(config.getJsonObject("http").getInteger("port", 8080))
                 .ignoreElement();
     }
 
