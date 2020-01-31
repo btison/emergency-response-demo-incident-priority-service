@@ -1,8 +1,11 @@
 http:
   port: 8080
+  realm: emergency-realm
+  auth-server-url: https://sso-user-sso-2.apps.erdemo-cf59.open.redhat.com/auth
+  client-name: vertx
+  client-secret: 5173df4b-9450-492b-b6a4-9854d74c172e
 kafka:
   bootstrap-servers: localhost:9092
   group-id: incident-priority
   topic-incident-assignment-event: topic-incident-event
-  topic-priority-zone-application-event: topic-priority-zone-event
-  
+
