@@ -1,8 +1,5 @@
 package com.redhat.emergency.response.incident.priority;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.oauth2.OAuth2FlowType;
@@ -17,6 +14,8 @@ import io.vertx.reactivex.ext.web.RoutingContext;
 import io.vertx.reactivex.ext.web.handler.BodyHandler;
 import io.vertx.reactivex.ext.web.handler.OAuth2AuthHandler;
 import io.vertx.reactivex.micrometer.PrometheusScrapingHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RestApiVerticle extends AbstractVerticle {
 

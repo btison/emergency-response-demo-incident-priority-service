@@ -1,5 +1,6 @@
 package com.redhat.emergency.response.incident.priority;
 
+import com.redhat.emergency.response.incident.priority.ha.MessageConsumerVerticle;
 import io.reactivex.Completable;
 import io.vertx.config.ConfigRetrieverOptions;
 import io.vertx.config.ConfigStoreOptions;
@@ -46,7 +47,8 @@ public class MainVerticle extends AbstractVerticle {
                 .flatMapCompletable(json -> {
                     JsonObject rest = json; //sso-config is created without an overarching key
                     JsonObject kafka = json.getJsonObject("kafka");
-                    return vertx.rxDeployVerticle(MessageConsumerVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement()
+                    return vertx.rxDeployVerticle(MessageForwardVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement()
+                            .andThen(vertx.rxDeployVerticle(MessageConsumerVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement())
                             .andThen(vertx.rxDeployVerticle(RulesVerticle::new, new DeploymentOptions()).ignoreElement())
                             .andThen(vertx.rxDeployVerticle(RestApiVerticle::new, new DeploymentOptions().setConfig(rest)).ignoreElement());
                 });
