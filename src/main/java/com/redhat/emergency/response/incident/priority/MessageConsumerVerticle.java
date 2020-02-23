@@ -10,6 +10,9 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.kafka.client.consumer.KafkaConsumer;
 import io.vertx.reactivex.kafka.client.consumer.KafkaConsumerRecord;
+import io.vertx.reactivex.kafka.client.producer.KafkaProducer;
+import io.vertx.reactivex.kafka.client.producer.KafkaProducerRecord;
+import org.apache.kafka.clients.producer.ProducerConfig;
 
 public class MessageConsumerVerticle extends AbstractVerticle {
 
@@ -17,25 +20,39 @@ public class MessageConsumerVerticle extends AbstractVerticle {
 
     private KafkaConsumer<String, String> kafkaConsumer;
 
+    private KafkaProducer<String, String> kafkaProducer;
+
+    private String eventTopic;
+
     @Override
     public Completable rxStart() {
 
         return Completable.fromMaybe(vertx.rxExecuteBlocking(future -> {
-            Map<String, String> kafkaConfig = new HashMap<>();
-            kafkaConfig.put("bootstrap.servers", config().getString("bootstrap-servers"));
-            kafkaConfig.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-            kafkaConfig.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-            kafkaConfig.put("group.id", config().getString("group-id"));
-            kafkaConfig.put("auto.offset.reset", "earliest");
-            kafkaConfig.put("enable.auto.commit", "false");
-            kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
+            Map<String, String> consumerKafkaConfig = new HashMap<>();
+            consumerKafkaConfig.put("bootstrap.servers", config().getString("bootstrap-servers"));
+            consumerKafkaConfig.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+            consumerKafkaConfig.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+            consumerKafkaConfig.put("group.id", config().getString("group-id"));
+            consumerKafkaConfig.put("auto.offset.reset", "earliest");
+            consumerKafkaConfig.put("enable.auto.commit", "false");
+            kafkaConsumer = KafkaConsumer.create(vertx, consumerKafkaConfig);
             kafkaConsumer.handler(this::handleMessage);
             kafkaConsumer.subscribe(config().getString("topic-incident-assignment-event"));
+
+            Map<String, String> kafkaConfig = new HashMap<>();
+            kafkaConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config().getString("bootstrap-servers"));
+            kafkaConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+            kafkaConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
+            kafkaConfig.put(ProducerConfig.ACKS_CONFIG, "all");
+            kafkaProducer = KafkaProducer.create(vertx, kafkaConfig);
+            eventTopic = config().getString("topic-incident-priority-event");
+
             future.complete();
         }));
     }
 
     private void handleMessage(KafkaConsumerRecord<String, String> msg) {
+        // filter out messages. IncidentReportedEvent and IncidentAssignmentEvent are forwarded to the event queue
         try {
             JsonObject message = new JsonObject(msg.value());
 
@@ -56,8 +73,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                 String incidentId = message.getJsonObject("body").getString("incidentId");
                 log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'. Topic: " + msg.topic()
                         + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
-
-                vertx.eventBus().send("incident-assignment-event", body);
+                forwardMessage(msg.key(), msg.value());
             } else if ("IncidentReportedEvent".equals(messageType)) {
                 JsonObject body = message.getJsonObject("body");
                 JsonObject payload = new JsonObject()
@@ -69,10 +85,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                 String incidentId = payload.getString("incidentId");
                 log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'. Topic: " + msg.topic()
                         + " ,  partition: " + msg.partition() + ", offset: " + msg.offset());
-
-                vertx.eventBus().send("incident-assignment-event", payload);
-            } else if ("PriorityZoneClearEvent".equals(messageType)) {
-                vertx.eventBus().send("priority-zone-clear-event", "");
+                forwardMessage(msg.key(), msg.value());
             } else {
                 log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
             }
@@ -81,6 +94,13 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             //commit message
             kafkaConsumer.commit();
         }
+    }
+
+    private void forwardMessage(String key, String message) {
+        KafkaProducerRecord<String, String> record = KafkaProducerRecord.create(eventTopic, key, message);
+        kafkaProducer.rxWrite(record).subscribe(
+                () -> log.debug("Sent message to topic " + eventTopic + ". Message : " + message),
+                t -> log.error("Error sending message to topic " + eventTopic, t));
     }
 
     @Override

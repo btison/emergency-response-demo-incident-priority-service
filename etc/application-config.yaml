@@ -4,6 +4,8 @@ kafka:
   bootstrap-servers: localhost:9092
   group-id: incident-priority
   topic-incident-assignment-event: topic-incident-event
+  topic-incident-priority-event: topic-incident-priority-event
+  topic-incident-priority-control: topic-incident-priority-control
 REALM: emergency-realm
 AUTH_URL: https://sso-user-sso-2.apps.erdemo-cf59.open.redhat.com/auth
 VERTX_CLIENTID: vertx
