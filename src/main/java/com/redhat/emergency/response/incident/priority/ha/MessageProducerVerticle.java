@@ -21,6 +21,8 @@ public class MessageProducerVerticle extends AbstractVerticle {
 
     private String controlTopic;
 
+    private String eventTopic;
+
     @Override
     public Completable rxStart() {
         return Completable.fromMaybe(vertx.rxExecuteBlocking(future -> {
@@ -31,22 +33,32 @@ public class MessageProducerVerticle extends AbstractVerticle {
             kafkaConfig.put(ProducerConfig.ACKS_CONFIG, "all");
             kafkaProducer = KafkaProducer.create(vertx, kafkaConfig);
             controlTopic = config().getString("topic-incident-priority-control");
-            vertx.eventBus().consumer("control-message-producer", this::handleMessage);
+            eventTopic = config().getString("topic-incident-priority-event");
+            vertx.eventBus().consumer("control-message-producer", this::handleControlMessage);
+            vertx.eventBus().consumer("command-message-producer", this::handleCommandMessage);
             future.complete();
             log.info("MessageProducerVerticle deployed");
         }));
     }
 
-    private void handleMessage(Message<JsonObject> message) {
-        KafkaProducerRecord<String, String> record = KafkaProducerRecord.create(controlTopic, message.body().getString("id"), message.body().toString());
+    private void handleControlMessage(Message<JsonObject> message) {
+        handleMessage(message, controlTopic, message.body().getString("id"));
+    }
+
+    private void handleCommandMessage(Message<JsonObject> message) {
+        handleMessage(message, eventTopic, message.body().getString("id"));
+    }
+
+    private void handleMessage(Message<JsonObject> message, String topic, String key) {
+        KafkaProducerRecord<String, String> record = KafkaProducerRecord.create(topic, key, message.body().toString());
         kafkaProducer.rxWrite(record).subscribe(
                 () -> {
-                    log.debug("Sent message to topic " + controlTopic + ". Message : " + message.body().toString());
+                    log.debug("Sent message to topic " + topic + ". Message : " + message.body().toString());
                     message.reply(new JsonObject());
                 },
                 t -> {
-                    log.error("Error sending message to topic " + controlTopic, t);
-                    message.reply(new JsonObject());
+                    log.error("Error sending message to topic " + topic, t);
+                    message.fail(-1, "Error sending message to topic " + topic);
                 });
     }
 

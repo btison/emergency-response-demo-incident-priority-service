@@ -1,6 +1,7 @@
 package com.redhat.emergency.response.incident.priority.ha;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,12 @@ import org.slf4j.LoggerFactory;
 public class MessageConsumerVerticle extends AbstractVerticle {
 
     private final Logger log = LoggerFactory.getLogger(MessageConsumerVerticle.class);
+
+    public static final String INCIDENT_ASSIGNMENT_EVENT = "IncidentAssignmentEvent";
+
+    public static final String COMMAND_EVENT = "IncidentPriorityCommandEvent";
+
+    private static final String[] ACCEPTED_MESSAGE_TYPES = {INCIDENT_ASSIGNMENT_EVENT, COMMAND_EVENT};
 
     private State currentState = State.REPLICA;
 
@@ -304,27 +311,46 @@ public class MessageConsumerVerticle extends AbstractVerticle {
                 return;
             }
             String messageType = message.getString("messageType");
-            if (!("IncidentAssignmentEvent".equals(messageType))) {
+            if (!Arrays.asList(ACCEPTED_MESSAGE_TYPES).contains(messageType)) {
                 log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
                 emitter.onComplete();
                 return;
             }
             JsonObject body = message.getJsonObject("body");
-            if (body == null
-                    || body.getString("incidentId") == null
-                    || body.getBoolean("assignment") == null) {
-                log.warn("Message of type '" + "' has unexpected structure: " + message.toString());
-                emitter.onComplete();
-                return;
-            }
-            String incidentId = message.getJsonObject("body").getString("incidentId");
-            log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'.");
+            switch (messageType) {
+                case INCIDENT_ASSIGNMENT_EVENT:
+                    if (body == null
+                            || body.getString("incidentId") == null
+                            || body.getBoolean("assignment") == null) {
+                        log.warn("Message of type '" + messageType + "' has unexpected structure: " + message.toString());
+                        emitter.onComplete();
+                        return;
+                    }
+                    String incidentId = message.getJsonObject("body").getString("incidentId");
+                    log.debug("Consumed '" + messageType + "' message for incident '" + incidentId + "'.");
 
-            vertx.eventBus().rxRequest("incident-assignment-event", body)
-                .subscribe(o -> emitter.onComplete(), t -> {
-                    log.error("Exception while sending assignment event", t);
+                    vertx.eventBus().rxRequest("incident-assignment-event", body)
+                            .subscribe(o -> emitter.onComplete(), t -> {
+                                log.error("Exception while sending assignment event", t);
+                                emitter.onComplete();
+                            });
+                    break;
+                case COMMAND_EVENT:
+                    if (body == null || body.getString("command") == null) {
+                        log.warn("Message of type '" + messageType + "' has unexpected structure: " + message.toString());
+                        emitter.onComplete();
+                        return;
+                    }
+                    vertx.eventBus().rxRequest("command", body)
+                            .subscribe(o -> emitter.onComplete(), t -> {
+                                log.error("Exception while sending control event", t);
+                                emitter.onComplete();
+                            });
+                    break;
+                default:
+                    log.debug("Unexpected message type '" + messageType + "' in message " + message + ". Ignoring message");
                     emitter.onComplete();
-                });
+            }
         });
 
     }

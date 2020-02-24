@@ -1,5 +1,9 @@
 package com.redhat.emergency.response.incident.priority;
 
+import java.time.Instant;
+import java.util.UUID;
+
+import com.redhat.emergency.response.incident.priority.ha.MessageConsumerVerticle;
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.oauth2.OAuth2FlowType;
@@ -153,7 +157,11 @@ public class RestApiVerticle extends AbstractVerticle {
     }
 
     private void reset(RoutingContext rc) {
-        vertx.eventBus().rxRequest("reset", new JsonObject())
+        JsonObject message = new JsonObject()
+                .put("id", UUID.randomUUID().toString()).put("messageType", MessageConsumerVerticle.COMMAND_EVENT)
+                .put("invokingService","IncidentPriorityService").put("timestamp", Instant.now().toEpochMilli())
+                .put("body", new JsonObject().put("command", "reset"));
+        vertx.eventBus().rxRequest("command-message-producer", message)
                 .subscribe((json) -> rc.response().setStatusCode(200).end(), rc::fail);
     }
 

@@ -54,7 +54,7 @@ public class RulesVerticle extends AbstractVerticle {
                 vertx.eventBus().consumer("priority-zones", this::priorityZones);
                 vertx.eventBus().consumer("priority-zone-application-event", this::priorityZone);
                 vertx.eventBus().consumer("priority-zone-clear-event", this::clearPriorityZones);
-                vertx.eventBus().consumer("reset", this::reset);
+                vertx.eventBus().consumer("command", this::command);
 
                 future.complete();
             } catch (Exception e) {
@@ -73,10 +73,15 @@ public class RulesVerticle extends AbstractVerticle {
         ksession.setGlobal("priorityZoneUpsurge", priorityZoneUpsurge);
     }
 
-    private void reset(Message<JsonObject> message) {
-        log.info("Resetting ksession");
-        initSession();
-        message.reply(new JsonObject());
+    private void command(Message<JsonObject> message) {
+        String command = message.body().getString("command");
+        if ("reset".equals(command)) {
+            log.info("Resetting ksession");
+            initSession();
+            message.reply(new JsonObject());
+        } else {
+            log.warn("Unrecognized command " + command + " in control message. Ignoring...");
+        }
     }
 
     private void assignmentEvent(Message<JsonObject> message) {
