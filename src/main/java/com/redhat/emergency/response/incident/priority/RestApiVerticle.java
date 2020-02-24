@@ -6,6 +6,7 @@ import io.vertx.ext.auth.oauth2.OAuth2FlowType;
 import io.vertx.ext.auth.oauth2.impl.OAuth2TokenImpl;
 import io.vertx.ext.healthchecks.Status;
 import io.vertx.reactivex.core.AbstractVerticle;
+import io.vertx.reactivex.core.eventbus.Message;
 import io.vertx.reactivex.ext.auth.oauth2.OAuth2Auth;
 import io.vertx.reactivex.ext.auth.oauth2.providers.KeycloakAuth;
 import io.vertx.reactivex.ext.healthchecks.HealthCheckHandler;
@@ -21,8 +22,11 @@ public class RestApiVerticle extends AbstractVerticle {
 
     private static final Logger log = LoggerFactory.getLogger(RestApiVerticle.class);
 
+    private boolean ready = false;
+
     @Override
     public Completable rxStart() {
+        vertx.eventBus().consumer("instance-status-ready", this::statusReady);
         return initializeHttpServer(config());
     }
 
@@ -45,9 +49,18 @@ public class RestApiVerticle extends AbstractVerticle {
         OAuth2AuthHandler oauth2Handler = OAuth2AuthHandler.create(oauth2);
         oauth2Handler.setupCallback(router.get("/callback"));
 
-        HealthCheckHandler healthCheckHandler = HealthCheckHandler.create(vertx)
-                .register("health", f -> f.complete(Status.OK()));
-        router.get("/health").handler(healthCheckHandler);
+        HealthCheckHandler livenessHandler = HealthCheckHandler.create(vertx)
+                .register("liveness", f -> f.complete(Status.OK()));
+        HealthCheckHandler readinessHandler = HealthCheckHandler.create(vertx)
+                .register("readiness", f -> {
+                    if (!ready) {
+                        f.complete(Status.KO());
+                    } else {
+                        f.complete(Status.OK());
+                    }
+                });
+        router.get("/liveness").handler(livenessHandler);
+        router.get("/readiness").handler(readinessHandler);
         router.get("/priority/:incidentId").handler(this::priority);
         router.post("/reset").handler(this::reset);
 
@@ -142,5 +155,9 @@ public class RestApiVerticle extends AbstractVerticle {
     private void reset(RoutingContext rc) {
         vertx.eventBus().rxRequest("reset", new JsonObject())
                 .subscribe((json) -> rc.response().setStatusCode(200).end(), rc::fail);
+    }
+
+    private <T> void statusReady(Message<T> tMessage) {
+        ready = true;
     }
 }

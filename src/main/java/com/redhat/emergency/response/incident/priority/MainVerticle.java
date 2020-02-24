@@ -54,12 +54,12 @@ public class MainVerticle extends AbstractVerticle {
                     JsonObject ha = json.getJsonObject("ha");
                     ha.put("running-on-kubernetes", runningOnKubernetes);
                     ha.put("namespace", Optional.ofNullable(namespace).orElse(""));
-                    return vertx.rxDeployVerticle(MessageConsumerVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement()
-                            .andThen(vertx.rxDeployVerticle(MessageProducerVerticle::new, new DeploymentOptions().setConfig(kafka))).ignoreElement()
-                            .andThen(vertx.rxDeployVerticle(BootstrapVerticle::new, new DeploymentOptions().setConfig(ha))).ignoreElement()
-                            .andThen(vertx.rxDeployVerticle(MessageForwardVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement())
+                    return vertx.rxDeployVerticle(RestApiVerticle::new, new DeploymentOptions().setConfig(json)).ignoreElement()
                             .andThen(vertx.rxDeployVerticle(RulesVerticle::new, new DeploymentOptions()).ignoreElement())
-                            .andThen(vertx.rxDeployVerticle(RestApiVerticle::new, new DeploymentOptions().setConfig(json)).ignoreElement());
+                            .andThen(vertx.rxDeployVerticle(MessageConsumerVerticle::new, new DeploymentOptions().setConfig(kafka))).ignoreElement()
+                            .andThen(vertx.rxDeployVerticle(MessageProducerVerticle::new, new DeploymentOptions().setConfig(kafka))).ignoreElement()
+                            .andThen(vertx.rxDeployVerticle(MessageForwardVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement())
+                            .andThen(vertx.rxDeployVerticle(BootstrapVerticle::new, new DeploymentOptions().setConfig(ha))).ignoreElement();
                 });
     }
 
