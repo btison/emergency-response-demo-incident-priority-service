@@ -32,10 +32,9 @@ public class BootstrapVerticle extends AbstractVerticle {
             }
             GlobalState.setNodeReady(Boolean.TRUE);
         }, err -> log.error("Failed deploying LeaderElection verticle", err));
+        log.info("BootstrapVerticle deployed");
         return Completable.complete();
     }
-
-
 
     @Override
     public Completable rxStop() {

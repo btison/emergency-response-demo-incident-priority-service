@@ -1,7 +1,6 @@
 package com.redhat.emergency.response.incident.priority.ha.infra.election;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.math.RoundingMode;
 import java.util.Date;
 import java.util.List;
@@ -16,9 +15,9 @@ import io.fabric8.kubernetes.api.model.ConfigMap;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.client.KubernetesClient;
 import io.reactivex.Completable;
+import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.eventbus.Message;
-import kafka.utils.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,12 +40,9 @@ public class LeaderElectionVerticle extends AbstractVerticle {
 
     private LeaderInfo latestLeaderInfo;
 
-    private List<LeadershipCallback> callbacks;
-
     public LeaderElectionVerticle(KubernetesClient kubernetesClient, KubernetesLockConfiguration lockConfiguration, State initialState) {
         this.kubernetesClient = kubernetesClient;
         this.lockConfiguration = lockConfiguration;
-        this.callbacks = new ArrayList<>();
         if (initialState != null) {
             this.currentState = initialState;
         }
@@ -92,7 +88,7 @@ public class LeaderElectionVerticle extends AbstractVerticle {
                 throw new RuntimeException("Unsupported state " + currentState);
         }
 
-        //TODO: notify other verticles
+        vertx.eventBus().send("message-consumer-update-state", new JsonObject().put("state", currentState));
     }
 
     private void rescheduleAfterDelay() {
