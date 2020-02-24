@@ -62,6 +62,17 @@ public class MessageConsumerVerticle extends AbstractVerticle {
         }));
     }
 
+    @Override
+    public Completable rxStop() {
+        log.info("Stopping MessageConsumerVerticle");
+        started = false;
+        if (currentState == State.REPLICA) {
+            return kafkaSecondaryConsumer.rxClose().andThen(kafkaConsumer.rxClose());
+        } else {
+            return kafkaConsumer.rxClose();
+        }
+    }
+
     private Map<String, String> kafkaConfig() {
         Map<String, String> kafkaConfig = new HashMap<>();
         kafkaConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, config().getString("bootstrap-servers"));
@@ -95,6 +106,15 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             }
         }
     }
+
+    private void updateOnRunningConsumer(State state) {
+        log.info("Update on running consumer. State = " + state);
+        //stopConsume()
+        //restartConsume()
+        //enableConsume
+    }
+
+
 
     private void enableConsume(State state) {
         if (state.equals(State.LEADER)) {
@@ -169,6 +189,9 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     private void processLeader(KafkaConsumerRecord<String, String> record) {
+        if (!started) {
+            return;
+        }
 
         // TODO snapshot handling
         handleMessage(record);
@@ -181,6 +204,9 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     private void processControlAsReplica(KafkaConsumerRecord<String, String> record) {
+        if (!started) {
+            return;
+        }
         if (record.offset() == processingKeyOffset + 1 || record.offset() == 0) {
             lastProcessedControlOffset = record.offset();
             processingKey = record.key();
@@ -194,6 +220,9 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     }
 
     private void processEventAsReplica(KafkaConsumerRecord<String, String> record) {
+        if (!started) {
+            return;
+        }
         handleMessage(record);
         lastProcessedEventOffset = record.offset();
 
