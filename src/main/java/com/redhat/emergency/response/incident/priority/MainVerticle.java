@@ -1,5 +1,8 @@
 package com.redhat.emergency.response.incident.priority;
 
+import java.util.Optional;
+
+import com.redhat.emergency.response.incident.priority.ha.BootstrapVerticle;
 import com.redhat.emergency.response.incident.priority.ha.MessageConsumerVerticle;
 import io.reactivex.Completable;
 import io.vertx.config.ConfigRetrieverOptions;
@@ -8,12 +11,10 @@ import io.vertx.core.DeploymentOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.reactivex.config.ConfigRetriever;
 import io.vertx.reactivex.core.AbstractVerticle;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class MainVerticle extends AbstractVerticle {
 
-    private static Logger log = LoggerFactory.getLogger(MainVerticle.class);
+    private boolean runningOnKubernetes = false;
 
     @Override
     public Completable rxStart() {
@@ -33,8 +34,11 @@ public class MainVerticle extends AbstractVerticle {
                 .setConfig(new JsonObject()
                         .put("name", System.getProperty("sso.configmap", "sso-config")));
         ConfigRetrieverOptions options = new ConfigRetrieverOptions();
-        if (System.getenv("KUBERNETES_NAMESPACE") != null) {
+
+        String namespace = System.getenv("KUBERNETES_NAMESPACE");
+        if (namespace != null) {
             //we're running in Kubernetes
+            runningOnKubernetes = true;
             options.addStore(configMapStore);
             options.addStore(ssoConfigMapStore);
         } else {
@@ -45,12 +49,16 @@ public class MainVerticle extends AbstractVerticle {
         ConfigRetriever retriever = ConfigRetriever.create(vertx, options);
         return retriever.rxGetConfig()
                 .flatMapCompletable(json -> {
-                    JsonObject rest = json; //sso-config is created without an overarching key
                     JsonObject kafka = json.getJsonObject("kafka");
-                    return vertx.rxDeployVerticle(MessageForwardVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement()
+                    JsonObject ha = json.getJsonObject("ha");
+                    ha.put("running-on-kubernetes", runningOnKubernetes);
+                    ha.put("namespace", Optional.ofNullable(namespace).orElse(""));
+                    return vertx.rxDeployVerticle(BootstrapVerticle::new, new DeploymentOptions().setConfig(ha)).ignoreElement()
+                            .andThen(vertx.rxDeployVerticle(MessageForwardVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement())
                             .andThen(vertx.rxDeployVerticle(MessageConsumerVerticle::new, new DeploymentOptions().setConfig(kafka)).ignoreElement())
                             .andThen(vertx.rxDeployVerticle(RulesVerticle::new, new DeploymentOptions()).ignoreElement())
-                            .andThen(vertx.rxDeployVerticle(RestApiVerticle::new, new DeploymentOptions().setConfig(rest)).ignoreElement());
+                            .andThen(vertx.rxDeployVerticle(RestApiVerticle::new, new DeploymentOptions().setConfig(json)).ignoreElement());
                 });
     }
+
 }

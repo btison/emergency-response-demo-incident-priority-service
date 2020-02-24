@@ -6,9 +6,9 @@ kafka:
   topic-incident-assignment-event: topic-incident-event
   topic-incident-priority-event: topic-incident-priority-event
   topic-incident-priority-control: topic-incident-priority-control
+ha:
+  leader-configmap: test
 REALM: emergency-realm
 AUTH_URL: https://sso-user-sso-2.apps.erdemo-cf59.open.redhat.com/auth
 VERTX_CLIENTID: vertx
 VERTX_CLIENT_SECRET: 5173df4b-9450-492b-b6a4-9854d74c172e
-    
-
