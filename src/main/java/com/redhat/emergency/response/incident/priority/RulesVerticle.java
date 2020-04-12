@@ -10,9 +10,12 @@ import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.micrometer.backends.BackendRegistries;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.eventbus.Message;
 import org.drools.core.io.impl.ClassPathResource;
@@ -41,6 +44,10 @@ public class RulesVerticle extends AbstractVerticle {
 
     private final Integer priorityZoneUpsurge = 50;
 
+    private Timer assignmentTimer;
+
+    private Timer queryTimer;
+
     @Override
     public Completable rxStart() {
         
@@ -55,6 +62,10 @@ public class RulesVerticle extends AbstractVerticle {
                 vertx.eventBus().consumer("priority-zone-application-event", this::priorityZone);
                 vertx.eventBus().consumer("priority-zone-clear-event", this::clearPriorityZones);
                 vertx.eventBus().consumer("command", this::command);
+
+                MeterRegistry registry = BackendRegistries.getDefaultNow();
+                assignmentTimer = Timer.builder("rules.assignment.timer").register(registry);
+                queryTimer = Timer.builder("rules.query.timer").register(registry);
 
                 future.complete();
             } catch (Exception e) {
@@ -86,16 +97,18 @@ public class RulesVerticle extends AbstractVerticle {
 
     private void assignmentEvent(Message<JsonObject> message) {
         log.debug("AssignmentEvent - received message: " + message.body().toString());
-
+        Timer.Sample s = Timer.start();
         IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
                 message.body().getBoolean("assignment"), new BigDecimal(message.body().getString("lat")), new BigDecimal(message.body().getString("lon")));
         ksession.insert(incidentAssignmentEvent);
         ksession.fireAllRules();
         message.reply(new JsonObject());
+        s.stop(assignmentTimer);
     }
 
     private void incidentPriority(Message<JsonObject> message) {
         log.debug("IncidentPriority - received message: " + message.body().toString());
+        Timer.Sample s = Timer.start();
         String incidentId = message.body().getString("incidentId");
         QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
         QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
@@ -125,6 +138,7 @@ public class RulesVerticle extends AbstractVerticle {
         JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
                 .put("average", average).put("incidents", results.size()).put("escalated", escalated).put("escalatedIncidents", escalatedIncidents);
         message.reply(jsonObject);
+        s.stop(queryTimer);
     }
 
     /**
