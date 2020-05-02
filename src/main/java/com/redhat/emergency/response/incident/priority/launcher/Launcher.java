@@ -1,5 +1,7 @@
 package com.redhat.emergency.response.incident.priority.launcher;
 
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -11,6 +13,7 @@ import io.vertx.core.Verticle;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxException;
 import io.vertx.core.VertxOptions;
+import io.vertx.micrometer.Label;
 import io.vertx.micrometer.MicrometerMetricsOptions;
 import io.vertx.micrometer.VertxPrometheusOptions;
 import org.slf4j.Logger;
@@ -26,9 +29,12 @@ public class Launcher {
 
     private void launch() {
 
+        Set<Label> labels = EnumSet.copyOf(MicrometerMetricsOptions.DEFAULT_LABELS);
+        labels.add(Label.HTTP_PATH);
         VertxOptions options = new VertxOptions().setMetricsOptions(
                 new MicrometerMetricsOptions()
                 .setPrometheusOptions(new VertxPrometheusOptions().setEnabled(true))
+                .setLabels(labels)
                 .setJvmMetricsEnabled(true)
                 .setEnabled(true));
 

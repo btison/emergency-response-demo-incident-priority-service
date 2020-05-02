@@ -3,10 +3,13 @@ package com.redhat.emergency.response.incident.priority;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
+import io.vertx.micrometer.backends.BackendRegistries;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.kafka.client.consumer.KafkaConsumer;
 import io.vertx.reactivex.kafka.client.consumer.KafkaConsumerRecord;
@@ -16,6 +19,8 @@ public class MessageConsumerVerticle extends AbstractVerticle {
     private final static Logger log = LoggerFactory.getLogger("MessageConsumer");
 
     private KafkaConsumer<String, String> kafkaConsumer;
+
+    private Counter kafkaMessageCounter;
 
     @Override
     public Completable rxStart() {
@@ -31,11 +36,17 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             kafkaConsumer = KafkaConsumer.create(vertx, kafkaConfig);
             kafkaConsumer.handler(this::handleMessage);
             kafkaConsumer.subscribe(config().getString("topic-incident-assignment-event"));
+
+            MeterRegistry registry = BackendRegistries.getDefaultNow();
+            kafkaMessageCounter = Counter.builder("kafka-message-consumed").tag("topic",config().getString("topic-incident-assignment-event"))
+                    .tag("consumergroup",config().getString("group-id")).register(registry);
+
             future.complete();
         }));
     }
 
     private void handleMessage(KafkaConsumerRecord<String, String> msg) {
+        kafkaMessageCounter.increment();
         try {
             JsonObject message = new JsonObject(msg.value());
 
