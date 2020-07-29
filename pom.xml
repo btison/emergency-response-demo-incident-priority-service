@@ -23,6 +23,8 @@
     <version.logback>1.2.3</version.logback>
     <version.logstash>5.1</version.logstash>
     <version.junit>4.12</version.junit>
+    <version.opentracing-kafka>0.1.13</version.opentracing-kafka>
+    <version.jaeger>0.35.1</version.jaeger>
     <vertx.launcher>com.redhat.emergency.response.incident.priority.launcher.Launcher</vertx.launcher>
   </properties>
   <dependencyManagement>
@@ -112,6 +114,16 @@
       <groupId>org.drools</groupId>
       <artifactId>drools-compiler</artifactId>
       <version>${version.rhdm}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.opentracing.contrib</groupId>
+      <artifactId>opentracing-kafka-client</artifactId>
+      <version>${version.opentracing-kafka}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.jaegertracing</groupId>
+      <artifactId>jaeger-client</artifactId>
+      <version>${version.jaeger}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>

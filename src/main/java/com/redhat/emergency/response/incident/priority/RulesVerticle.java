@@ -10,8 +10,12 @@ import com.redhat.emergency.response.incident.priority.rules.model.IncidentPrior
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZone;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneApplicationEvent;
 import com.redhat.emergency.response.incident.priority.rules.model.PriorityZoneClearEvent;
+import com.redhat.emergency.response.incident.priority.tracing.TracingUtils;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.opentracing.Span;
+import io.opentracing.Tracer;
+import io.opentracing.util.GlobalTracer;
 import io.reactivex.Completable;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -42,6 +46,8 @@ public class RulesVerticle extends AbstractVerticle {
 
     private KieSession ksession;
 
+    private Tracer tracer;
+
     private final Integer priorityZoneUpsurge = 50;
 
     private Timer assignmentTimer;
@@ -55,6 +61,7 @@ public class RulesVerticle extends AbstractVerticle {
         
         return Completable.fromMaybe(vertx.<Void>rxExecuteBlocking(future -> {
             try {
+                tracer = GlobalTracer.get();
                 kbase = setupKieBase("com/redhat/emergency/response/incident/priority/rules/priority_rules.drl");
                 initSession();
 
@@ -96,47 +103,61 @@ public class RulesVerticle extends AbstractVerticle {
     private void assignmentEvent(Message<JsonObject> message) {
         log.debug("AssignmentEvent - received message: " + message.body().toString());
         Timer.Sample s = Timer.start();
-        IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
-                message.body().getBoolean("assignment"), new BigDecimal(message.body().getString("lat")), new BigDecimal(message.body().getString("lon")));
-        ksession.insert(incidentAssignmentEvent);
-        ksession.fireAllRules();
-        s.stop(assignmentTimer);
+        Span span = TracingUtils.buildChildSpan("incidentPriorityAssignment", message, tracer);
+        try {
+            IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
+                    message.body().getBoolean("assignment"), new BigDecimal(message.body().getString("lat")), new BigDecimal(message.body().getString("lon")));
+            ksession.insert(incidentAssignmentEvent);
+            ksession.fireAllRules();
+        } finally {
+            if (span != null) {
+                span.finish();
+            }
+            s.stop(assignmentTimer);
+        }
+
     }
 
     private void incidentPriority(Message<JsonObject> message) {
         log.debug("IncidentPriority - received message: " + message.body().toString());
         Timer.Sample s = Timer.start();
-        String incidentId = message.body().getString("incidentId");
-        QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
-        QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
-        Integer priority;
-        boolean escalated;
-        if (row == null) {
-            priority = 0;
-            escalated = false;
-        } else {
-            priority = ((IncidentPriority)row.get("incidentPriority")).getPriority();
-            escalated = ((IncidentPriority)row.get("incidentPriority")).getEscalated();
-        }
+        Span span = TracingUtils.buildChildSpan("getIncidentPriority", message, tracer);
+        try {
+            String incidentId = message.body().getString("incidentId");
+            QueryResults results = ksession.getQueryResults("incidentPriority", incidentId);
+            QueryResultsRow row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+            Integer priority;
+            boolean escalated;
+            if (row == null) {
+                priority = 0;
+                escalated = false;
+            } else {
+                priority = ((IncidentPriority) row.get("incidentPriority")).getPriority();
+                escalated = ((IncidentPriority) row.get("incidentPriority")).getEscalated();
+            }
 
-        results = ksession.getQueryResults("averagePriority");
-        row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
-        Double average;
-        if (row == null) {
-            average = 0.0;
-        } else {
-            average = ((AveragePriority)row.get("averagePriority")).getAveragePriority();
-        }
+            results = ksession.getQueryResults("averagePriority");
+            row = StreamSupport.stream(results.spliterator(), false).findFirst().orElse(null);
+            Double average;
+            if (row == null) {
+                average = 0.0;
+            } else {
+                average = ((AveragePriority) row.get("averagePriority")).getAveragePriority();
+            }
 
-        results = ksession.getQueryResults("incidents");
-        kieSessionDepth.set(results.size());
-        Integer escalatedIncidents = Math.toIntExact(StreamSupport.stream(results.spliterator(), false).filter(incident -> {
-            return ((IncidentPriority)incident.get("incidentPriority")).getEscalated();
-        }).count());
-        JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
-                .put("average", average).put("incidents", results.size()).put("escalated", escalated).put("escalatedIncidents", escalatedIncidents);
-        message.reply(jsonObject);
-        s.stop(queryTimer);
+            results = ksession.getQueryResults("incidents");
+            kieSessionDepth.set(results.size());
+            Integer escalatedIncidents = Math.toIntExact(StreamSupport.stream(results.spliterator(), false)
+                    .filter(incident -> ((IncidentPriority) incident.get("incidentPriority")).getEscalated()).count());
+            JsonObject jsonObject = new JsonObject().put("incidentId", incidentId).put("priority", priority)
+                    .put("average", average).put("incidents", results.size()).put("escalated", escalated).put("escalatedIncidents", escalatedIncidents);
+            message.reply(jsonObject);
+        } finally {
+            if (span != null) {
+                span.finish();
+            }
+            s.stop(queryTimer);
+        }
     }
 
     /**
