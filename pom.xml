@@ -22,7 +22,7 @@
     <version.slf4j>1.7.25</version.slf4j>
     <version.logback>1.2.3</version.logback>
     <version.logstash>5.1</version.logstash>
-    <version.junit>4.12</version.junit>
+    <version.junit>4.13.1</version.junit>
     <vertx.launcher>com.redhat.emergency.response.incident.priority.launcher.Launcher</vertx.launcher>
   </properties>
   <dependencyManagement>
