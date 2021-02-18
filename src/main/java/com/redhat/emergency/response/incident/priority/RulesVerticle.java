@@ -97,7 +97,7 @@ public class RulesVerticle extends AbstractVerticle {
         log.debug("AssignmentEvent - received message: " + message.body().toString());
         Timer.Sample s = Timer.start();
         IncidentAssignmentEvent incidentAssignmentEvent = new IncidentAssignmentEvent(message.body().getString("incidentId"),
-                message.body().getBoolean("assignment"), new BigDecimal(message.body().getString("lat")), new BigDecimal(message.body().getString("lon")));
+                message.body().getBoolean("assignment"), BigDecimal.valueOf(message.body().getDouble("lat")), BigDecimal.valueOf(message.body().getDouble("lon")));
         ksession.insert(incidentAssignmentEvent);
         ksession.fireAllRules();
         s.stop(assignmentTimer);

@@ -77,7 +77,7 @@ public class MessageConsumerVerticle extends AbstractVerticle {
             JsonObject event = new JsonObject(new String(cloudEvent.getData().toBytes()));
             if (INCIDENT_ASSIGNMENT_EVENT.equals(messageType)) {
                 if (event.getString("incidentId") == null || event.getBoolean("assignment") == null ||
-                        event.getString("lat") == null || event.getString("lon") == null) {
+                        event.getDouble("lat") == null || event.getDouble("lon") == null) {
                     log.warn("Message of type '" + "' has unexpected structure: " + event.toString());
                     return;
                 }
